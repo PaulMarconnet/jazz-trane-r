@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jazz Trane'R — Studio Thème Sombre Chaud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Bebas+Neue&family=Big+Shoulders+Display:wght@700;800&family=Oswald:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Serif+Display&family=Instrument+Serif&family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Figtree:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   TOKENS (pilotés par le JS)
+   ===================================================================== */
+:root {
+    --bg: #100d0b;
+    --card: #1a1613;
+    --elev: #241f1b;
+    --text: #f2e9dc;
+    --muted: #a39584;
+    --accent: #e8a54b;
+    --accent-rgb: 232, 165, 75;
+    --accent-ink: #1a120b;
+    --accent2: #8fa876;
+    --accent2-rgb: 143, 168, 118;
+    --danger: #d0694f;
+    --danger-rgb: 208, 105, 79;
+    --border: rgba(242, 233, 220, 0.07);
+    --border-hover: rgba(232, 165, 75, 0.28);
+    --radius: 16px;
+    --ctl-radius: 10px;
+    --glow: 0.22;
+    --font-body: 'Plus Jakarta Sans', sans-serif;
+    --font-display: 'Barlow Condensed', sans-serif;
+    --font-title: 'Plus Jakarta Sans', sans-serif;
+    --grain: 0.05;
+    --ambient: 1;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { color-scheme: dark; }
+body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    transition: background-color .25s ease, color .25s ease;
+}
+body::before { /* lueur d'ambiance */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(1200px 500px at 70% -10%, rgba(var(--accent-rgb), calc(0.07 * var(--ambient))), transparent 70%);
+}
+body::after { /* grain analogique */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100;
+    opacity: var(--grain);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay;
+}
+svg.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+/* =====================================================================
+   PANNEAU DE CONTRÔLE (UI neutre, indépendante du thème testé)
+   ===================================================================== */
+.panel {
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: #0b0b0c; border-right: 1px solid #222; color: #ddd;
+    font-family: 'Inter', sans-serif; font-size: 13px; padding: 20px 18px 60px; z-index: 50;
+}
+.panel h1 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+.panel .sub { color: #888; font-size: 12px; margin-bottom: 18px; line-height: 1.45; }
+.panel h2 { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: #8a8a8a; margin: 22px 0 10px; font-weight: 700; }
+.presets { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.preset {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px;
+    background: #141416; border: 1px solid #242428; cursor: pointer; text-align: left; color: #ddd; font-family: inherit;
+    transition: border-color .15s, background .15s;
+}
+.preset:hover { border-color: #3a3a40; }
+.preset.active { border-color: #e8a54b; background: #1b1712; }
+.preset .sw { display: flex; border-radius: 6px; overflow: hidden; flex-shrink: 0; border: 1px solid #333; }
+.preset .sw span { width: 12px; height: 30px; }
+.preset .pname { font-weight: 600; font-size: 12.5px; color: #f2f2f2; display: flex; align-items: center; gap: 6px; }
+.preset .ptag { font-size: 11px; color: #8a8a8a; line-height: 1.3; margin-top: 1px; }
+.reco { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; background: #e8a54b; color: #1a120b; padding: 2px 5px; border-radius: 4px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.row label { color: #bbb; font-size: 12px; }
+.color-ctl { display: flex; align-items: center; gap: 6px; }
+.color-ctl input[type=color] { width: 28px; height: 28px; border: 1px solid #333; border-radius: 6px; background: none; padding: 0; cursor: pointer; }
+.color-ctl input[type=text] { width: 76px; background: #141416; border: 1px solid #2a2a2e; color: #ddd; border-radius: 6px; padding: 5px 6px; font-family: 'IBM Plex Sans', monospace; font-size: 11.5px; }
+.panel select { width: 170px; background: #141416; border: 1px solid #2a2a2e; color: #ddd; border-radius: 6px; padding: 6px; font-family: inherit; font-size: 12px; }
+.panel input[type=range] { width: 150px; accent-color: #e8a54b; }
+.seg { display: flex; background: #141416; border: 1px solid #2a2a2e; border-radius: 8px; padding: 2px; }
+.seg button { flex: 1; background: none; border: none; color: #999; font-family: inherit; font-size: 11.5px; padding: 6px 4px; border-radius: 6px; cursor: pointer; }
+.seg button.on { background: #2a2620; color: #f2d7a8; }
+.contrast { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 10px; font-size: 11.5px; align-items: center; }
+.contrast .ok { color: #8fbf7a; font-weight: 700; } .contrast .mid { color: #e2b25a; font-weight: 700; } .contrast .ko { color: #e0705a; font-weight: 700; }
+.panel textarea { width: 100%; height: 190px; background: #0f0f11; border: 1px solid #2a2a2e; color: #cfc; border-radius: 8px; padding: 8px; font-family: Consolas, monospace; font-size: 10.5px; resize: vertical; }
+.pbtn { background: #1d1d21; border: 1px solid #333; color: #eee; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.pbtn:hover { border-color: #e8a54b; }
+.pbtn.primary { background: #e8a54b; color: #1a120b; border-color: #e8a54b; font-weight: 700; }
+.note { font-size: 11px; color: #7d7d7d; line-height: 1.45; margin-top: 6px; }
+
+/* =====================================================================
+   APERÇU — MAQUETTE DE L'APPLICATION
+   ===================================================================== */
+.stage { position: relative; z-index: 1; padding: 22px 28px 80px; max-width: 1180px; }
+.app-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.logo { display: flex; flex-direction: column; line-height: .86; font-family: var(--font-display); text-transform: uppercase; user-select: none; }
+.logo .l1 { font-size: 13px; font-weight: 700; letter-spacing: .55em; color: var(--muted); margin-bottom: 3px; }
+.logo .l2 { font-size: 34px; font-weight: 800; letter-spacing: .02em; color: var(--text); }
+.logo .l2 b { color: var(--accent); font-weight: 800; }
+.nav { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--border); padding: 4px; border-radius: calc(var(--ctl-radius) + 4px); }
+.nav button { background: none; border: none; color: var(--muted); font-family: inherit; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: var(--ctl-radius); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: all .15s; }
+.nav button:hover { color: var(--text); }
+.nav button.on { background: rgba(var(--accent-rgb), .14); color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), calc(var(--glow) * .8)); }
+.hdr-tools { display: flex; gap: 8px; }
+
+.grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 20px; }
+.grid > .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: 0 6px 24px rgba(0,0,0,.35);
+    transition: background-color .25s, border-color .25s;
+}
+.section-title { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.title-font { font-family: var(--font-title); }
+
+/* Boutons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: var(--ctl-radius); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all .15s ease; white-space: nowrap; }
+.btn.icon { width: 38px; padding: 0; }
+.btn-solid { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 4px 16px rgba(var(--accent-rgb), calc(var(--glow) * 1.3)); }
+.btn-solid:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-ghost-accent { background: rgba(var(--accent-rgb), .10); color: var(--accent); border-color: rgba(var(--accent-rgb), .32); }
+.btn-ghost-accent:hover { background: rgba(var(--accent-rgb), .18); border-color: var(--accent); }
+.btn-neutral { background: transparent; color: var(--muted); border-color: var(--border); }
+.btn-neutral:hover { color: var(--text); border-color: var(--border-hover); background: rgba(var(--accent-rgb), .06); }
+.btn-neutral.on { color: var(--accent); border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .10); }
+.btn-wide { width: 100%; height: 46px; font-size: 14.5px; font-weight: 700; }
+
+/* Corbeille : 3 styles */
+.btn-trash { background: transparent; color: var(--muted); border-color: var(--border); }
+.btn-trash:hover { color: var(--danger); background: rgba(var(--danger-rgb), .12); border-color: rgba(var(--danger-rgb), .45); }
+[data-trash="solid"] .btn-trash { color: var(--danger); border-color: rgba(var(--danger-rgb), .35); background: rgba(var(--danger-rgb), .08); }
+[data-trash="mono"] .btn-trash:hover { color: var(--text); background: rgba(var(--accent-rgb), .06); border-color: var(--border-hover); }
+
+/* Chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip { font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all .15s; }
+.chip:hover { color: var(--text); border-color: var(--border-hover); }
+.chip.on { color: var(--accent); background: rgba(var(--accent-rgb), .15); border-color: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), var(--glow)); }
+.chip.sm { font-size: 11.5px; padding: 4px 10px; }
+
+/* Items de séance */
+.draft { display: flex; align-items: center; gap: 12px; padding: 12px 12px; border-radius: calc(var(--radius) - 4px); background: var(--elev); border: 1px solid var(--border); margin-bottom: 8px; transition: border-color .15s; }
+.draft:hover { border-color: var(--border-hover); }
+.draft .grip { color: var(--muted); opacity: .6; cursor: grab; }
+.draft .info { flex: 1; min-width: 0; }
+.draft .name { font-family: var(--font-title); font-weight: 600; font-size: 14.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.draft .meta { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+.dur { display: flex; align-items: center; border: 1px solid var(--border); border-radius: var(--ctl-radius); overflow: hidden; height: 32px; }
+.dur button { background: transparent; border: none; color: var(--muted); width: 28px; height: 100%; cursor: pointer; font-size: 15px; font-family: inherit; }
+.dur button:hover { color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+.dur span { min-width: 46px; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Badges */
+.badge { font-size: 11px; font-weight: 550; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); background: transparent; white-space: nowrap; }
+.badge.acc { color: var(--accent); border-color: rgba(var(--accent-rgb), .28); background: rgba(var(--accent-rgb), .07); }
+.badge.key { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Toggle */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--border); margin-top: 6px; }
+.toggle-row .lbl { font-size: 13.5px; font-weight: 600; }
+.toggle-row .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.switch { width: 42px; height: 24px; border-radius: 999px; background: rgba(var(--accent-rgb), .08); border: 1px solid var(--border); position: relative; cursor: pointer; transition: all .2s; flex-shrink: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: all .2s; }
+.switch.on { background: rgba(var(--accent-rgb), .25); border-color: var(--accent); }
+.switch.on::after { left: 21px; background: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb), .6); }
+
+/* Métronome */
+.metro { text-align: center; }
+.bpm { font-family: var(--font-display); font-size: 76px; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.bpm-lbl { font-size: 11px; letter-spacing: .3em; color: var(--muted); font-weight: 700; margin-top: 2px; }
+.beats { display: flex; justify-content: center; gap: 14px; margin: 18px 0; }
+.beat { width: 16px; height: 16px; border-radius: 50%; background: rgba(var(--accent-rgb), .12); border: 1px solid rgba(var(--accent-rgb), .3); transition: all .08s; }
+.beat.down { width: 20px; height: 20px; border-color: rgba(var(--accent-rgb), .55); }
+.beat.lit { background: rgba(var(--accent-rgb), .6); box-shadow: 0 0 12px rgba(var(--accent-rgb), .55); }
+.beat.down.lit { background: var(--accent); box-shadow: 0 0 18px rgba(var(--accent-rgb), .8); }
+.metro-ctl { display: flex; justify-content: center; align-items: center; gap: 10px; }
+.slider-fake { height: 6px; border-radius: 3px; background: rgba(var(--accent-rgb), .12); margin: 16px 6px 6px; position: relative; }
+.slider-fake::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 46%; border-radius: 3px; background: linear-gradient(90deg, rgba(var(--accent-rgb), .5), var(--accent)); }
+.slider-fake::after { content: ""; position: absolute; left: 46%; top: 50%; width: 16px; height: 16px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--text); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .25); }
+
+/* Bibliothèque */
+.search { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--ctl-radius); padding: 0 12px; height: 40px; color: var(--muted); flex: 1; min-width: 160px; }
+.search input { background: none; border: none; outline: none; color: var(--text); font-family: inherit; font-size: 13.5px; flex: 1; }
+.search input::placeholder { color: var(--muted); opacity: .8; }
+.search:focus-within { border-color: rgba(var(--accent-rgb), .55); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .12); }
+.lib-tools { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.lib-item { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: calc(var(--radius) - 4px); border: 1px solid var(--border); background: var(--card); margin-bottom: 10px; transition: border-color .15s, background .15s; }
+.lib-item:hover { border-color: var(--border-hover); background: var(--elev); }
+.thumb { width: 54px; height: 54px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--border); background: var(--bg); color: var(--muted); overflow: hidden; }
+.thumb.pdf { color: var(--accent); background: rgba(var(--accent-rgb), .10); border-color: rgba(var(--accent-rgb), .25); }
+.thumb.img { background: repeating-linear-gradient(0deg, var(--text) 0 1px, transparent 1px 7px), var(--elev); opacity: .9; background-blend-mode: normal; }
+.thumb.img::after { content: ""; }
+.lib-item .info { flex: 1; min-width: 0; }
+.lib-item .name { font-family: var(--font-title); font-weight: 600; font-size: 15px; display: block; margin-bottom: 3px; }
+.lib-item .count { font-size: 12.5px; color: var(--muted); }
+.lib-item .badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.lib-item .acts { display: flex; gap: 6px; }
+.fav-on { color: var(--accent) !important; border-color: rgba(var(--accent-rgb), .4) !important; }
+.fav-on svg { fill: var(--accent); }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.stat { background: var(--elev); border: 1px solid var(--border); border-radius: calc(var(--radius) - 4px); padding: 14px 10px; text-align: center; }
+.stat .v { font-family: var(--font-display); font-size: 30px; font-weight: 800; line-height: 1; display: flex; align-items: center; justify-content: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 11px; color: var(--muted); margin-top: 6px; font-weight: 600; letter-spacing: .04em; }
+.stat .v.streak { color: var(--accent2); }
+.bars { display: flex; align-items: flex-end; gap: 10px; height: 110px; padding: 0 4px; }
+.bars .b { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+.bars .b i { display: block; width: 100%; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--accent), rgba(var(--accent-rgb), .35)); box-shadow: 0 0 10px rgba(var(--accent-rgb), calc(var(--glow) * .6)); }
+.bars .b.today i { background: linear-gradient(180deg, var(--accent2), rgba(var(--accent2-rgb), .35)); box-shadow: 0 0 10px rgba(var(--accent2-rgb), calc(var(--glow) * .6)); }
+.bars .b span { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+
+/* HUD Live / Pupitre */
+.hud { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 999px; background: color-mix(in srgb, var(--card) 92%, transparent); border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,.5); backdrop-filter: blur(8px); }
+.hud .t { font-family: var(--font-title); font-weight: 600; font-size: 14px; text-align: center; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud .t small { display: block; font-family: var(--font-body); font-size: 11px; color: var(--muted); font-weight: 500; }
+.hud .btn { border-radius: 999px; }
+.timer { font-family: var(--font-display); font-size: 54px; font-weight: 800; letter-spacing: .02em; text-align: center; font-variant-numeric: tabular-nums; line-height: 1; margin: 6px 0 14px; }
+.progress { height: 4px; background: rgba(var(--accent-rgb), .12); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
+.progress i { display: block; height: 100%; width: 62%; background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), .6); }
+
+/* Toast */
+.toast { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--ctl-radius); background: var(--elev); border: 1px solid rgba(var(--accent2-rgb), .35); color: var(--text); font-size: 13px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.toast .dot { color: var(--accent2); }
+
+.palette-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.palette-strip div { flex: 1; min-width: 70px; border-radius: 10px; padding: 34px 8px 8px; font-size: 10.5px; font-weight: 600; border: 1px solid var(--border); }
+.palette-strip div span { display: block; opacity: .75; font-weight: 500; font-family: Consolas, monospace; }
+
+@media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+@media (max-width: 820px) { body { grid-template-columns: 1fr; } .panel { position: relative; height: auto; } .stage { padding: 18px 14px 60px; } }
+</style>
+</head>
+<body data-trash="ghost">
+
+<!-- =================================================================== -->
+<aside class="panel" id="panel">
+    <h1>Studio Thème Sombre Chaud</h1>
+    <p class="sub">Esthétique café · automne · crème · ivoire. Choisissez un préréglage puis affinez. Tout est sauvegardé localement.</p>
+
+    <h2>Préréglages</h2>
+    <div class="presets" id="presets"></div>
+
+    <h2>Couleurs</h2>
+    <div id="colors"></div>
+    <div class="row"><label>Bordures</label>
+        <div class="seg" id="seg-border"><button data-v="cream">Crème</button><button data-v="accent">Teintées accent</button></div>
+    </div>
+
+    <h2>Typographie</h2>
+    <div class="row"><label>Texte (UI)</label><select id="f-body"></select></div>
+    <div class="row"><label>Titres morceaux</label><select id="f-title"></select></div>
+    <div class="row"><label>Logo &amp; chiffres</label><select id="f-display"></select></div>
+
+    <h2>Forme &amp; ambiance</h2>
+    <div class="row"><label>Arrondi cartes</label><input type="range" id="r-radius" min="4" max="26" step="1"></div>
+    <div class="row"><label>Intensité des halos</label><input type="range" id="r-glow" min="0" max="50" step="1"></div>
+    <div class="row"><label>Grain analogique</label><input type="range" id="r-grain" min="0" max="14" step="1"></div>
+    <div class="row"><label>Lueur d'ambiance</label><input type="range" id="r-ambient" min="0" max="20" step="1"></div>
+    <div class="row"><label>Corbeilles</label>
+        <div class="seg" id="seg-trash"><button data-v="ghost">Neutre → rouge</button><button data-v="solid">Rouge</button><button data-v="mono">Mono</button></div>
+    </div>
+
+    <h2>Contraste (WCAG)</h2>
+    <div class="contrast" id="contrast"></div>
+    <p class="note">AA = 4.5 pour le texte courant, 3.0 pour les grands textes / icônes.</p>
+
+    <h2>Export vers l'application</h2>
+    <textarea id="export" readonly></textarea>
+    <div class="row" style="margin-top:8px;">
+        <button class="pbtn primary" id="btn-copy">Copier le CSS</button>
+        <button class="pbtn" id="btn-reset">Réinitialiser</button>
+    </div>
+</aside>
+
+<!-- =================================================================== -->
+<main class="stage">
+    <header class="app-header">
+        <div class="logo"><span class="l1">Jazz</span><span class="l2">Trane<b>'</b>R</span></div>
+        <nav class="nav">
+            <button class="on"><svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>Pratique</button>
+            <button><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Création</button>
+            <button><svg class="ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>Bibliothèque</button>
+            <button><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>Historique</button>
+        </nav>
+        <div class="hdr-tools">
+            <button class="btn btn-neutral icon" title="Métronome"><svg class="ic" viewBox="0 0 24 24"><path d="M9 3h6l4 18H5z"/><line x1="12" y1="17" x2="17" y2="6"/></svg></button>
+            <button class="btn btn-neutral icon" title="Paramètres"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        </div>
+    </header>
+
+    <div class="grid">
+        <div class="col">
+            <!-- Programme de la séance -->
+            <section class="card">
+                <div class="section-title">Programme de la séance <span style="letter-spacing:0;text-transform:none;font-weight:600;">Total 45 min</span></div>
+                <div class="chips">
+                    <button class="chip on">Tous (32)</button><button class="chip">Morceaux</button><button class="chip">Voicings</button><button class="chip">Licks</button><button class="chip">Relevés</button>
+                </div>
+                <div class="chips">
+                    <button class="chip sm on">II-V-I</button><button class="chip sm">Shell voicings</button><button class="chip sm">Rootless A/B</button><button class="chip sm">Drop 2</button>
+                </div>
+                <div class="draft">
+                    <svg class="ic grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg>
+                    <div class="info"><div class="name">Rootless voicings — II-V-I majeur</div><div class="meta"><span class="badge acc">Voicings</span><span class="badge key">B♭</span></div></div>
+                    <div class="dur"><button>−</button><span>15 min</span><button>+</button></div>
+                    <button class="btn btn-trash icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                </div>
+                <div class="draft">
+                    <svg class="ic grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg>
+                    <div class="info"><div class="name">Sunshine Race</div><div class="meta"><span class="badge acc">Morceaux</span><span class="badge">Jazz 1460</span></div></div>
+                    <div class="dur"><button>−</button><span>20 min</span><button>+</button></div>
+                    <button class="btn btn-trash icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                </div>
+                <div class="draft">
+                    <svg class="ic grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg>
+                    <div class="info"><div class="name">Enclosures sur les guide tones</div><div class="meta"><span class="badge acc">Licks</span><span class="badge key">F</span></div></div>
+                    <div class="dur"><button>−</button><span>10 min</span><button>+</button></div>
+                    <button class="btn btn-trash icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                </div>
+                <div class="toggle-row">
+                    <div><div class="lbl">Tonalité du jour</div><div class="hint">Impose une tonalité commune à tous les exercices</div></div>
+                    <div class="switch" onclick="this.classList.toggle('on')"></div>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button class="btn btn-solid btn-wide" style="flex:1"><svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor"/></svg>Démarrer la séance</button>
+                    <button class="btn btn-ghost-accent btn-wide" style="width:auto; padding:0 18px;"><svg class="ic" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>Setlists</button>
+                </div>
+            </section>
+
+            <!-- Bibliothèque -->
+            <section class="card">
+                <div class="section-title">Bibliothèque musicale</div>
+                <div class="lib-tools">
+                    <label class="search"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg><input placeholder="Rechercher un titre, une catégorie…"></label>
+                    <button class="btn btn-neutral"><svg class="ic" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.5 10 19 14 21 14 12.5 22 3"/></svg>Filtre</button>
+                    <button class="btn btn-neutral"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg>Tri</button>
+                    <button class="btn btn-neutral on"><svg class="ic" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg>Favoris</button>
+                </div>
+                <div class="lib-item">
+                    <div class="thumb pdf"><svg class="ic" viewBox="0 0 24 24" style="width:24px;height:24px"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+                    <div class="info"><span class="name">Sunshine Race</span><span class="count">Pratiqué 3 fois</span><div class="badges"><span class="badge acc">Morceaux</span><span class="badge">Jazz 1460</span></div></div>
+                    <div class="acts">
+                        <button class="btn btn-neutral icon fav-on"><svg class="ic" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></button>
+                        <button class="btn btn-neutral icon"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                        <button class="btn btn-trash icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+                    </div>
+                </div>
+                <div class="lib-item">
+                    <div class="thumb img"></div>
+                    <div class="info"><span class="name">Solar — relevé chorus Bill Evans</span><span class="count">Pratiqué 12 fois</span><div class="badges"><span class="badge acc">Relevés</span><span class="badge">Cahier</span></div></div>
+                    <div class="acts">
+                        <button class="btn btn-neutral icon"><svg class="ic" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></button>
+                        <button class="btn btn-neutral icon"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                        <button class="btn btn-trash icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+                    </div>
+                </div>
+                <div class="lib-item">
+                    <div class="thumb"><svg class="ic" viewBox="0 0 24 24" style="width:22px;height:22px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+                    <div class="info"><span class="name">Blues mineur — backing track</span><span class="count">Pratiqué 0 fois</span><div class="badges"><span class="badge acc">Morceaux</span><span class="badge">Audio</span></div></div>
+                    <div class="acts">
+                        <button class="btn btn-neutral icon"><svg class="ic" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></button>
+                        <button class="btn btn-neutral icon"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                        <button class="btn btn-trash icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="col">
+            <!-- Séance en cours / HUD -->
+            <section class="card">
+                <div class="section-title">Séance en cours <span class="badge acc" style="letter-spacing:0;">2 / 3</span></div>
+                <div class="timer">12:47</div>
+                <div class="progress"><i></i></div>
+                <div class="hud">
+                    <button class="btn btn-neutral icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+                    <div class="t title-font">Sunshine Race<small>Morceaux · Jazz 1460</small></div>
+                    <button class="btn btn-solid icon"><svg class="ic" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+                    <button class="btn btn-neutral icon"><svg class="ic" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+                </div>
+            </section>
+
+            <!-- Métronome -->
+            <section class="card metro">
+                <div class="section-title">Métronome <span style="display:flex;gap:6px;"><button class="chip sm on">Swing</button><button class="chip sm">Clave 3-2</button></span></div>
+                <div class="bpm" id="bpm">132</div>
+                <div class="bpm-lbl">BPM</div>
+                <div class="slider-fake"></div>
+                <div class="beats" id="beats"><div class="beat down"></div><div class="beat"></div><div class="beat"></div><div class="beat"></div></div>
+                <div class="metro-ctl">
+                    <button class="btn btn-neutral icon" onclick="setBpm(-1)">−</button>
+                    <button class="btn btn-solid" id="metro-btn" style="min-width:120px;" onclick="toggleMetro()"><svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor"/></svg>Lancer</button>
+                    <button class="btn btn-neutral icon" onclick="setBpm(1)">+</button>
+                </div>
+            </section>
+
+            <!-- Statistiques -->
+            <section class="card">
+                <div class="section-title">Statistiques</div>
+                <div class="stats">
+                    <div class="stat"><div class="v streak"><svg class="ic" viewBox="0 0 24 24" style="width:22px;height:22px"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.3 1.2 1.3 2.2 2.5 2.7z"/></svg>12</div><div class="k">jours de suite</div></div>
+                    <div class="stat"><div class="v">14,5</div><div class="k">heures ce mois</div></div>
+                    <div class="stat"><div class="v">38</div><div class="k">séances</div></div>
+                </div>
+                <div class="bars">
+                    <div class="b"><i style="height:40%"></i><span>L</span></div>
+                    <div class="b"><i style="height:72%"></i><span>M</span></div>
+                    <div class="b"><i style="height:55%"></i><span>M</span></div>
+                    <div class="b"><i style="height:20%"></i><span>J</span></div>
+                    <div class="b"><i style="height:88%"></i><span>V</span></div>
+                    <div class="b"><i style="height:64%"></i><span>S</span></div>
+                    <div class="b today"><i style="height:48%"></i><span>D</span></div>
+                </div>
+            </section>
+
+            <div class="toast"><svg class="ic dot" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Séance enregistrée — 45 min ajoutées à l'historique</div>
+
+            <!-- Nuancier -->
+            <section class="card">
+                <div class="section-title">Nuancier actif</div>
+                <div class="palette-strip" id="strip"></div>
+            </section>
+        </div>
+    </div>
+</main>
+
+<script>
+/* =====================================================================
+   PRÉRÉGLAGES — références réelles d'interfaces chaudes à succès
+   ===================================================================== */
+const PRESETS = [
+    { id: 'creme', name: 'Espresso Crème', reco: true, tag: 'Notre sélection : espresso profond, encre crème, ambre miel adouci, sauge en second.',
+      bg: '#100d0b', card: '#1a1613', elev: '#241f1b', text: '#f2e9dc', muted: '#a39584', accent: '#e8a54b', accent2: '#8fa876', danger: '#d0694f',
+      border: 'cream', body: 'Plus Jakarta Sans', title: 'Plus Jakarta Sans', display: 'Barlow Condensed' },
+    { id: 'studio', name: 'Espresso Studio (actuel)', tag: 'La version actuellement dans l\'appli.',
+      bg: '#0c0b0a', card: '#151311', elev: '#1e1b18', text: '#f6f4ee', muted: '#9e978e', accent: '#feb83e', accent2: '#feb83e', danger: '#ef4444',
+      border: 'accent', body: 'Plus Jakarta Sans', title: 'Plus Jakarta Sans', display: 'Barlow Condensed' },
+    { id: 'club', name: 'Jazz Club Fraunces', tag: 'Même base que la sélection, titres en serif douce (style label vinyle / Blue Note moderne).',
+      bg: '#110d0a', card: '#1b1612', elev: '#26201a', text: '#f3e8d8', muted: '#a8977f', accent: '#e3a24a', accent2: '#9aae7c', danger: '#cc6a4e',
+      border: 'cream', body: 'DM Sans', title: 'Fraunces', display: 'Barlow Condensed' },
+    { id: 'melange', name: 'Melange', tag: 'Thème d\'éditeur culte (savq/melange) : brun chaud, encre crème, orange cuivré.',
+      bg: '#211d1a', card: '#292522', elev: '#34302c', text: '#ece1d7', muted: '#c1a78e', accent: '#e49b5d', accent2: '#85b695', danger: '#d47766',
+      border: 'cream', body: 'Manrope', title: 'Manrope', display: 'Barlow Condensed' },
+    { id: 'gruvbox', name: 'Gruvbox Dark', tag: 'Palette rétro « groove » ultra populaire : brun-gris, crème, jaune moutarde.',
+      bg: '#1d2021', card: '#282828', elev: '#32302f', text: '#ebdbb2', muted: '#a89984', accent: '#fabd2f', accent2: '#b8bb26', danger: '#fb4934',
+      border: 'cream', body: 'IBM Plex Sans', title: 'IBM Plex Sans', display: 'Oswald' },
+    { id: 'ristretto', name: 'Ristretto', tag: 'Filtre « Ristretto » de Monokai Pro : moka rosé, encre ivoire, jaune crème.',
+      bg: '#211c1c', card: '#2c2525', elev: '#3a3131', text: '#fff1f3', muted: '#948a8b', accent: '#f9cc6c', accent2: '#adda78', danger: '#fd6883',
+      border: 'cream', body: 'Outfit', title: 'Outfit', display: 'Bebas Neue' },
+    { id: 'clay', name: 'Argile (Clay)', tag: 'Inspiré de l\'interface sombre de Claude : gris chaud neutre, ivoire, terracotta.',
+      bg: '#1f1e1d', card: '#262624', elev: '#30302e', text: '#faf9f5', muted: '#a6a39b', accent: '#d97757', accent2: '#c9a86a', danger: '#c4554d',
+      border: 'cream', body: 'DM Sans', title: 'Instrument Serif', display: 'Barlow Condensed' },
+    { id: 'kanagawa', name: 'Kanagawa Dragon', tag: 'Variante « Dragon » de Kanagawa : encre de Chine, papier washi, or pâle.',
+      bg: '#12120f', card: '#181616', elev: '#282727', text: '#c5c9c5', muted: '#a6a69c', accent: '#c4b28a', accent2: '#87a987', danger: '#c4746e',
+      border: 'cream', body: 'Figtree', title: 'Figtree', display: 'Big Shoulders Display' },
+    { id: 'ember', name: 'Braise d\'automne', tag: 'Rouille et orange brûlé, feuilles mortes : le plus « automne ».',
+      bg: '#140f0c', card: '#1d1612', elev: '#281e18', text: '#f3e6d3', muted: '#a89482', accent: '#d9773a', accent2: '#e6b35a', danger: '#c2493b',
+      border: 'accent', body: 'Work Sans', title: 'Work Sans', display: 'Oswald' },
+    { id: 'bourbon', name: 'Bourbon Lounge', tag: 'Whisky, cuir et velours bordeaux d\'un club de jazz tamisé.',
+      bg: '#120c0c', card: '#1b1313', elev: '#251a19', text: '#f1e4d4', muted: '#a3908a', accent: '#c9944a', accent2: '#b5615a', danger: '#c0473f',
+      border: 'cream', body: 'Nunito Sans', title: 'Playfair Display', display: 'Barlow Condensed' },
+    { id: 'mocha', name: 'Mocha Mousse', tag: 'Couleur Pantone 2025 : moka crémeux, très doux et feutré (peu saturé).',
+      bg: '#17120f', card: '#211a16', elev: '#2c231e', text: '#efe4d6', muted: '#a8968a', accent: '#c9a383', accent2: '#93a37a', danger: '#c0634f',
+      border: 'cream', body: 'Manrope', title: 'DM Serif Display', display: 'Barlow Condensed' },
+    { id: 'brass', name: 'Tabac & Laiton', tag: 'Ampli à lampes vintage : noir tabac, laiton patiné, olive.',
+      bg: '#0f0e0c', card: '#1a1814', elev: '#24211b', text: '#ece4d2', muted: '#9c9483', accent: '#c8a85a', accent2: '#8a9a5b', danger: '#b9563f',
+      border: 'cream', body: 'Inter', title: 'Space Grotesk', display: 'Big Shoulders Display' },
+];
+
+const BODY_FONTS = ['Plus Jakarta Sans', 'DM Sans', 'Manrope', 'Inter', 'Outfit', 'Figtree', 'Work Sans', 'IBM Plex Sans', 'Nunito Sans', 'Space Grotesk'];
+const TITLE_FONTS = ['(identique au texte)', 'Fraunces', 'Instrument Serif', 'DM Serif Display', 'Playfair Display', 'Space Grotesk', ...BODY_FONTS.filter(f => f !== 'Space Grotesk')];
+const DISPLAY_FONTS = ['Barlow Condensed', 'Bebas Neue', 'Oswald', 'Big Shoulders Display', 'Fraunces', 'DM Serif Display', 'Space Grotesk'];
+const SERIFS = ['Fraunces', 'Instrument Serif', 'DM Serif Display', 'Playfair Display'];
+
+const COLOR_FIELDS = [
+    ['bg', 'Fond'], ['card', 'Cartes'], ['elev', 'Encarts'], ['text', 'Texte principal'],
+    ['muted', 'Texte secondaire'], ['accent', 'Accent principal'], ['accent2', 'Accent secondaire'], ['danger', 'Danger / suppression'],
+];
+
+const DEFAULT_EXTRA = { radius: 16, glow: 22, grain: 5, ambient: 10, trash: 'ghost' };
+const STORE = 'jt-warm-theme-studio-v1';
+let state = loadState();
+
+function loadState() {
+    try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && s.bg) return s; } catch (e) { }
+    return { ...PRESETS[0], ...DEFAULT_EXTRA, preset: PRESETS[0].id };
+}
+function save() { localStorage.setItem(STORE, JSON.stringify(state)); }
+
+/* ---------- utilitaires couleur ---------- */
+const hexToRgb = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const rgbStr = h => hexToRgb(h).join(', ');
+const lum = h => { const a = hexToRgb(h).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]; };
+const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
+const isHex = v => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
+function mix(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
+const fontStack = f => SERIFS.includes(f) ? `'${f}', Georgia, serif` : `'${f}', -apple-system, 'Segoe UI', sans-serif`;
+
+/* ---------- application ---------- */
+function apply() {
+    const r = document.documentElement.style;
+    r.setProperty('--bg', state.bg); r.setProperty('--card', state.card); r.setProperty('--elev', state.elev);
+    r.setProperty('--text', state.text); r.setProperty('--muted', state.muted);
+    r.setProperty('--accent', state.accent); r.setProperty('--accent-rgb', rgbStr(state.accent));
+    r.setProperty('--accent2', state.accent2); r.setProperty('--accent2-rgb', rgbStr(state.accent2));
+    r.setProperty('--danger', state.danger); r.setProperty('--danger-rgb', rgbStr(state.danger));
+    // texte sur bouton plein : encre sombre tirée du fond, sauf accent trop sombre
+    const ink = mix(state.bg, '#000000', 0.2);
+    r.setProperty('--accent-ink', ratio(state.accent, ink) >= 4.5 ? ink : state.text);
+    const borderBase = state.border === 'accent' ? rgbStr(state.accent) : rgbStr(state.text);
+    r.setProperty('--border', `rgba(${borderBase}, ${state.border === 'accent' ? 0.09 : 0.07})`);
+    r.setProperty('--border-hover', `rgba(${rgbStr(state.accent)}, 0.28)`);
+    r.setProperty('--radius', state.radius + 'px');
+    r.setProperty('--ctl-radius', Math.max(4, Math.round(state.radius * 0.62)) + 'px');
+    r.setProperty('--glow', (state.glow / 100).toFixed(2));
+    r.setProperty('--grain', (state.grain / 100).toFixed(2));
+    r.setProperty('--ambient', (state.ambient / 10).toFixed(2));
+    r.setProperty('--font-body', fontStack(state.body));
+    r.setProperty('--font-title', fontStack(state.title === '(identique au texte)' ? state.body : state.title));
+    r.setProperty('--font-display', fontStack(state.display));
+    document.body.dataset.trash = state.trash;
+    renderContrast(); renderStrip(); renderExport(); syncControls(); save();
+}
+
+/* ---------- panneau ---------- */
+function buildPanel() {
+    document.getElementById('presets').innerHTML = PRESETS.map(p => `
+        <button class="preset" data-id="${p.id}">
+            <span class="sw">${[p.bg, p.card, p.elev, p.text, p.accent, p.accent2].map(c => `<span style="background:${c}"></span>`).join('')}</span>
+            <span><span class="pname">${p.name}${p.reco ? '<span class="reco">Reco</span>' : ''}</span><span class="ptag" style="display:block">${p.tag}</span></span>
+        </button>`).join('');
+    document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
+        const p = PRESETS.find(x => x.id === b.dataset.id);
+        state = { ...state, ...p, preset: p.id }; delete state.tag; delete state.name; delete state.reco; apply();
+    });
+
+    document.getElementById('colors').innerHTML = COLOR_FIELDS.map(([k, l]) => `
+        <div class="row"><label>${l}</label><span class="color-ctl"><input type="color" data-k="${k}"><input type="text" data-k="${k}" maxlength="7"></span></div>`).join('');
+    document.querySelectorAll('#colors input').forEach(inp => inp.addEventListener('input', () => {
+        const v = inp.value.trim(); if (!isHex(v)) return;
+        state[inp.dataset.k] = v.toLowerCase(); state.preset = null; apply();
+    }));
+
+    const fill = (id, list) => { document.getElementById(id).innerHTML = list.map(f => `<option>${f}</option>`).join(''); };
+    fill('f-body', BODY_FONTS); fill('f-title', TITLE_FONTS); fill('f-display', DISPLAY_FONTS);
+    [['f-body', 'body'], ['f-title', 'title'], ['f-display', 'display']].forEach(([id, k]) =>
+        document.getElementById(id).onchange = e => { state[k] = e.target.value; apply(); });
+
+    [['r-radius', 'radius'], ['r-glow', 'glow'], ['r-grain', 'grain'], ['r-ambient', 'ambient']].forEach(([id, k]) =>
+        document.getElementById(id).oninput = e => { state[k] = +e.target.value; apply(); });
+
+    document.querySelectorAll('#seg-trash button').forEach(b => b.onclick = () => { state.trash = b.dataset.v; apply(); });
+    document.querySelectorAll('#seg-border button').forEach(b => b.onclick = () => { state.border = b.dataset.v; state.preset = null; apply(); });
+
+    document.getElementById('btn-copy').onclick = async e => {
+        const ta = document.getElementById('export');
+        try { await navigator.clipboard.writeText(ta.value); } catch (err) { ta.select(); document.execCommand('copy'); }
+        e.target.textContent = 'Copié'; setTimeout(() => e.target.textContent = 'Copier le CSS', 1400);
+    };
+    document.getElementById('btn-reset').onclick = () => { state = { ...PRESETS[0], ...DEFAULT_EXTRA, preset: PRESETS[0].id }; apply(); };
+}
+
+function syncControls() {
+    document.querySelectorAll('.preset').forEach(b => b.classList.toggle('active', b.dataset.id === state.preset));
+    document.querySelectorAll('#colors input').forEach(inp => { if (document.activeElement !== inp) inp.value = state[inp.dataset.k]; });
+    document.getElementById('f-body').value = state.body;
+    document.getElementById('f-title').value = (state.title === state.body && !TITLE_FONTS.includes(state.title)) ? '(identique au texte)' : state.title;
+    document.getElementById('f-display').value = state.display;
+    document.getElementById('r-radius').value = state.radius; document.getElementById('r-glow').value = state.glow;
+    document.getElementById('r-grain').value = state.grain; document.getElementById('r-ambient').value = state.ambient;
+    document.querySelectorAll('#seg-trash button').forEach(b => b.classList.toggle('on', b.dataset.v === state.trash));
+    document.querySelectorAll('#seg-border button').forEach(b => b.classList.toggle('on', b.dataset.v === state.border));
+}
+
+function renderContrast() {
+    const rows = [
+        ['Texte / fond', state.text, state.bg, 4.5], ['Texte / carte', state.text, state.card, 4.5],
+        ['Secondaire / carte', state.muted, state.card, 4.5], ['Secondaire / encart', state.muted, state.elev, 4.5],
+        ['Accent / carte', state.accent, state.card, 3], ['Accent 2 / carte', state.accent2, state.card, 3],
+        ['Danger / carte', state.danger, state.card, 3],
+    ];
+    document.getElementById('contrast').innerHTML = rows.map(([l, a, b, min]) => {
+        const r = ratio(a, b); const cls = r >= min + 1 ? 'ok' : r >= min ? 'mid' : 'ko';
+        return `<span>${l}</span><span>${r.toFixed(2)}</span><span class="${cls}">${r >= min ? (r >= 7 && min === 4.5 ? 'AAA' : 'AA') : 'Faible'}</span>`;
+    }).join('');
+}
+
+function renderStrip() {
+    const items = [['Fond', state.bg, state.text], ['Cartes', state.card, state.text], ['Encarts', state.elev, state.text], ['Texte', state.text, state.bg],
+                   ['Secondaire', state.muted, state.bg], ['Accent', state.accent, state.bg], ['Accent 2', state.accent2, state.bg], ['Danger', state.danger, state.bg]];
+    document.getElementById('strip').innerHTML = items.map(([n, c, fg]) => `<div style="background:${c};color:${fg}">${n}<span>${c}</span></div>`).join('');
+}
+
+function renderExport() {
+    const a = rgbStr(state.accent), bg = rgbStr(state.bg), card = rgbStr(state.card);
+    const borderBase = state.border === 'accent' ? a : rgbStr(state.text);
+    const title = state.title === '(identique au texte)' ? state.body : state.title;
+    const ink = getComputedStyle(document.documentElement).getPropertyValue('--accent-ink').trim();
+    document.getElementById('export').value =
+`/* Jazz Trane'R — thème sombre chaud${state.preset ? ' « ' + PRESETS.find(p => p.id === state.preset).name + ' »' : ' (personnalisé)'} */
+:root, [data-theme="oled"] {
+    --bg-color: ${state.bg};
+    --card-bg: ${state.card};
+    --card-bg-elevated: ${state.elev};
+    --input-bg: ${mix(state.bg, state.card, 0.35)};
+    --border-color: rgba(${borderBase}, ${state.border === 'accent' ? 0.09 : 0.07});
+    --border-color-hover: rgba(${a}, 0.28);
+    --text-primary: ${state.text};
+    --text-muted: ${state.muted};
+
+    --accent-amber: ${state.accent};
+    --accent-amber-rgb: ${a};
+    --accent-green: var(--accent-amber);
+    --accent-green-rgb: var(--accent-amber-rgb);
+    --accent-blue: var(--accent-amber);
+    --accent-blue-rgb: var(--accent-amber-rgb);
+    --btn-solid-green-text: ${ink};
+    --accent-secondary: ${state.accent2};
+    --accent-secondary-rgb: ${rgbStr(state.accent2)};
+    --accent-red: ${state.danger};
+
+    --btn-neutral-bg: transparent;
+    --btn-neutral-hover: rgba(${a}, 0.06);
+    --card-radius: ${state.radius}px;
+    --hud-bg: rgba(${card}, 0.94);
+    --hud-top-gradient: linear-gradient(to bottom, rgba(${bg}, 0.94), rgba(${bg}, 0.4) 75%, transparent);
+    --hud-text: ${state.text};
+}
+body { font-family: ${fontStack(state.body)}; }
+.app-title, .bpm-display { font-family: ${fontStack(state.display)}; }
+/* Titres de morceaux : ${title} */
+/* Halos : ${state.glow}% · Grain : ${state.grain}% · Corbeilles : ${state.trash} */`;
+}
+
+/* ---------- métronome de démo (pour juger les déclinaisons d'accent) ---------- */
+let metroTimer = null, beatIdx = 0, bpm = 132;
+function setBpm(d) { bpm = Math.min(300, Math.max(30, bpm + d)); document.getElementById('bpm').textContent = bpm; if (metroTimer) { toggleMetro(); toggleMetro(); } }
+function toggleMetro() {
+    const btn = document.getElementById('metro-btn'); const beats = [...document.querySelectorAll('.beat')];
+    if (metroTimer) { clearInterval(metroTimer); metroTimer = null; beats.forEach(b => b.classList.remove('lit')); btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor"/></svg>Lancer'; return; }
+    beatIdx = 0;
+    const tick = () => { beats.forEach((b, i) => b.classList.toggle('lit', i === beatIdx)); beatIdx = (beatIdx + 1) % beats.length; };
+    tick(); metroTimer = setInterval(tick, 60000 / bpm);
+    btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"/></svg>Arrêter';
+}
+
+/* petites interactions de la maquette */
+document.querySelectorAll('.chips, .nav').forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('.chip, .nav button'); if (!b) return;
+    g.querySelectorAll('.chip, button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+}));
+
+buildPanel();
+apply();
+</script>
+</body>
+</html>
