@@ -6,11 +6,11 @@
 
 **Recommended model:** **Gemini 3.8 Flash (Medium)** *(ou **Gemini 4 Argon (Low)**)* — Tâche directe de configuration, nettoyage et CSS ciblé, idéale pour économiser tes crédits.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `vitest` est installé et configuré pour exécuter les tests des modules dans `www/modules/` via `npm test`, avec un premier test de fumée passant au vert.
-- [ ] Les fichiers de démonstration HTML sont déplacés hors de `www/` (vers la racine du dépôt) afin de ne plus être embarqués dans l'APK Android, et la dépendance inutilisée `capacitor-plugin-send-intent` est retirée.
-- [ ] Le Service Worker met bien en cache le fichier d'internationalisation ainsi que les nouveaux modules, et les appels redondants dans le gestionnaire de clic global des modales sont nettoyés.
-- [ ] Sur écran tactile (tablette), toucher un bouton (ex. *Ajouter à la séance*) déclenche un retour `:active` net mais ne laisse aucun état `:hover` ou focus lumineux collé après le tap (`@media (hover: hover) and (pointer: fine)`).
-- [ ] Tous les badges de durée et chronomètres (total de séance programmée, durée de séance en direct, badges de temps des exercices) utilisent `font-variant-numeric: tabular-nums` et une largeur minimale fixe de sorte que les éléments adjacents ne bougent jamais quand le temps défile.
-- [ ] Les titres des **Cadres** et sous-sections internes du Métronome, du Dictaphone, du Lecteur Audio et du Trieur Express respectent le style harmonisé en petites majuscules espacées et couleur `--text-muted`.
+- [x] `vitest` est installé et configuré pour exécuter les tests des modules dans `www/modules/` via `npm test`, avec un premier test de fumée passant au vert.
+- [x] Les fichiers de démonstration HTML sont déplacés hors de `www/` (vers la racine du dépôt) afin de ne plus être embarqués dans l'APK Android, et la dépendance inutilisée `capacitor-plugin-send-intent` est retirée.
+- [x] Le Service Worker met bien en cache le fichier d'internationalisation ainsi que les nouveaux modules, et les appels redondants dans le gestionnaire de clic global des modales sont nettoyés.
+- [x] Sur écran tactile (tablette), toucher un bouton (ex. *Ajouter à la séance*) déclenche un retour `:active` net mais ne laisse aucun état `:hover` ou focus lumineux collé après le tap (`@media (hover: hover) and (pointer: fine)`).
+- [x] Tous les badges de durée et chronomètres (total de séance programmée, durée de séance en direct, badges de temps des exercices) utilisent `font-variant-numeric: tabular-nums` et une largeur minimale fixe de sorte que les éléments adjacents ne bougent jamais quand le temps défile.
+- [x] Les titres des **Cadres** et sous-sections internes du Métronome, du Dictaphone, du Lecteur Audio et du Trieur Express respectent le style harmonisé en petites majuscules espacées et couleur `--text-muted`.

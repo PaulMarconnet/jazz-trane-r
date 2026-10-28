@@ -133,9 +133,9 @@
             <div id="top-global-actions"
                 style="position: absolute; right: 0; top: 0; display: flex; align-items: center; gap: 8px; z-index: 10;">
                 <div id="duree-seance-live" style="display: none; align-items: center; font-size: 13px; color: var(--text-muted);">
-                    <span style="display: inline-flex; align-items: center; gap: 6px; background: var(--card-bg-elevated); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-variant-numeric: tabular-nums;">
-                        <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span id="texte-duree-seance-live">0 min</span>
+                    <span class="badge-live-duration" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--card-bg-elevated); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-variant-numeric: tabular-nums;">
+                        <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <span id="texte-duree-seance-live">00:00</span>
                     </span>
                 </div>
                 <button id="btn-pause-global" class="btn-action btn-ghost-neutral btn-square" disabled
@@ -986,7 +986,7 @@
                 <!-- Bannière d'information du fichier -->
                 <div
                     style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); padding: 12px; border-radius: 6px; margin-bottom: 24px; text-align: center;">
-                    <span style="color: var(--text-muted); font-size: 13px;">Fichier en cours :</span>
+                    <span class="cadre-section-title" style="display: block;">Fichier en cours :</span>
                     <div id="trieur-nom-fichier-courant"
                         style="color: var(--accent-blue); font-weight: 600; margin-top: 4px; word-break: break-all;">
                         nom_du_fichier.pdf</div>
@@ -999,8 +999,7 @@
                         <!-- BLOC FUSION -->
                         <div id="trieur-mode-fusion"
                             style="display: none; background: rgba(88, 166, 255, 0.05); border: 1px solid rgba(88, 166, 255, 0.3); padding: 16px; border-radius: 6px; margin-bottom: 24px;">
-                            <div
-                                style="color: var(--accent-blue); font-size: 13px; font-weight: 600; margin-bottom: 4px;">
+                            <div class="cadre-section-title" style="margin-bottom: 6px;">
                                 Fichier associé à l'élément existant :</div>
                             <div id="trieur-fusion-titre"
                                 style="font-size: 18px; font-weight: 600; color: var(--text-primary);">Titre</div>
@@ -1015,7 +1014,7 @@
 
                         <!-- BLOC CRÉATION CLASSIQUE -->
                         <div id="trieur-mode-creation">
-                            <label>Titre de l'élément</label>
+                            <label class="cadre-section-title">Titre de l'élément</label>
                             <div style="position: relative; margin-bottom: 24px;">
                                 <input type="text" id="trieur-input-titre" placeholder="Ex: Autumn Leaves"
                                     style="font-size: 16px; padding: 10px 12px; width: 100%;"
@@ -1025,11 +1024,11 @@
                                 </div>
                             </div>
 
-                            <label>Catégorie</label>
+                            <label class="cadre-section-title">Catégorie</label>
                             <div id="trieur-chips-categorie"
                                 style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;"></div>
 
-                            <label id="trieur-label-sous-categorie" style="display: none;">Sous-catégorie</label>
+                            <label id="trieur-label-sous-categorie" class="cadre-section-title" style="display: none;">Sous-catégorie</label>
                             <div id="trieur-chips-sous-categorie"
                                 style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;"></div>
                         </div>
@@ -1462,7 +1461,7 @@
             <!-- SECTION MESURE & CLAVE (Séquenceur de temps) -->
             <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 14px; margin-bottom: 20px; text-align: left;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <label style="font-size: 13px; font-weight: 600; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.8px;">Décomposition & Clave</label>
+                    <label class="cadre-section-title" style="margin-bottom: 0;">Décomposition & Clave</label>
                     <!-- Sélecteur Noire / Croche avec uniquement les logos -->
                     <div class="metro-unit-selector">
                         <button type="button" id="btn-metro-unit-4" class="metro-unit-btn active" onclick="reglerUniteMetronome(4)" title="Débit à la Noire">
@@ -1548,7 +1547,7 @@
 
             <!-- SECTION BOUCLE A-B -->
             <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
-                <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; text-align: center;">
+                <div class="cadre-section-title" style="margin-bottom: 12px; text-align: center;">
                     BOUCLE
                 </div>
                 <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
@@ -1569,7 +1568,7 @@
 
             <!-- SECTION VITESSE -->
             <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
-                <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; text-align: center;">
+                <div class="cadre-section-title" style="margin-bottom: 12px; text-align: center;">
                     VITESSE
                 </div>
                 <div id="transcribe-speed-pills" style="display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap;">
@@ -1644,7 +1643,7 @@
                 <!-- Lecteur de la prise -->
                 <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-primary);">Écouter la prise</span>
+                        <span class="cadre-section-title">Écouter la prise</span>
                         <span id="dictaphone-duree-prise" style="font-size: 12px; font-family: monospace; color: var(--accent-blue); font-weight: 600;">00:00</span>
                     </div>
                     <audio id="dictaphone-audio-player" controls style="width: 100%; height: 36px; border-radius: 6px;"></audio>
@@ -1652,11 +1651,11 @@
 
                 <!-- Bloc Enregistrer dans la bibliothèque -->
                 <div id="dictaphone-bloc-biblio" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
-                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-primary); margin-bottom: 12px;">Enregistrer dans la bibliothèque</div>
+                    <div class="cadre-section-title" style="margin-bottom: 12px;">Enregistrer dans la bibliothèque</div>
 
                     <!-- Titre de l'enregistrement -->
                     <div style="margin-bottom: 12px;">
-                        <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Titre de l'enregistrement</label>
+                        <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block;">Titre de l'enregistrement</label>
                         <input type="text" id="dictaphone-input-titre" placeholder="Nom de l'enregistrement..." style="width: 100%;">
                     </div>
 
@@ -1838,8 +1837,14 @@
         </div>
     </div>
 
-    <script src="i18n.js?v=33"></script>
-    <script src="script.js?v=33"></script>
+    <script src="i18n.js?v=34"></script>
+    <script src="modules/library-domain.js?v=34"></script>
+    <script src="modules/session-timer.js?v=34"></script>
+    <script src="modules/history-analytics.js?v=34"></script>
+    <script src="modules/score-navigation.js?v=34"></script>
+    <script src="modules/storage-repo.js?v=34"></script>
+    <script src="modules/system-host.js?v=34"></script>
+    <script src="script.js?v=34"></script>
 </body>
 
 </html>

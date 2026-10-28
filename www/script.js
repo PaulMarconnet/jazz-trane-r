@@ -453,6 +453,14 @@ function resetDerniereInteraction() { dernierInteractionTimestamp = Date.now(); 
 ['pointerdown', 'keydown', 'touchstart'].forEach(evt => {
     window.addEventListener(evt, resetDerniereInteraction, { passive: true });
 });
+
+// Relâchement du focus persistant sur les boutons après un tap tactile (évite l'état collé sur tablette)
+window.addEventListener('touchend', function (e) {
+    const btn = e.target && e.target.closest ? e.target.closest('button, .btn-action') : null;
+    if (btn && typeof btn.blur === 'function') {
+        setTimeout(() => btn.blur(), 60);
+    }
+}, { passive: true });
 const AFK_LIMIT_SECONDS = 3600; // 1 heure d'inactivité
 
 function formaterDureeSeance(secondes) {
@@ -3967,40 +3975,31 @@ function fermerModal() { document.getElementById('modal-graph').style.display = 
 // ==========================================
 // --- VOCABULAIRE ET BIBLIOTHÈQUE        ---
 // ==========================================
+const MODAL_BACKDROP_CLOSERS = {
+    'modal-audio-player': () => typeof fermerModalAudioPlayer === 'function' && fermerModalAudioPlayer(),
+    'modal-metronome': () => typeof fermerModalMetronome === 'function' && fermerModalMetronome(),
+    'modal-dictaphone': () => typeof fermerModalDictaphone === 'function' && fermerModalDictaphone(),
+    'modal-graph': () => typeof fermerModal === 'function' && fermerModal(),
+    'modal-image-fullscreen': () => typeof fermerModalImage === 'function' && fermerModalImage(),
+    'modal-routines': () => typeof fermerModalRoutines === 'function' && fermerModalRoutines(),
+    'modal-save-routine': () => typeof fermerModalSaveRoutine === 'function' && fermerModalSaveRoutine(),
+    'modal-playlist': () => typeof fermerModalPlaylist === 'function' && fermerModalPlaylist(),
+    'modal-settings': () => typeof fermerModalSettings === 'function' && fermerModalSettings(),
+    'modal-trieur': () => typeof fermerTrieur === 'function' && fermerTrieur(),
+    'modal-cahier-choix': () => typeof fermerModalCahierChoix === 'function' && fermerModalCahierChoix(),
+    'modal-cahier-save': () => typeof fermerModalCahierSave === 'function' && fermerModalCahierSave(),
+    'modal-concert-setlist': () => typeof fermerSetlistDrawer === 'function' && fermerSetlistDrawer()
+};
+
 window.onclick = function (event) {
     if (!event.target.closest('.dropdown') || event.target.closest('.dropdown-content button')) {
         fermerTousLesDropdowns();
     }
-    if (event.target.classList.contains('modal')) { 
-        if (event.target.id === 'modal-audio-player') {
-            fermerModalAudioPlayer();
-            return;
-        }
-        if (event.target.id === 'modal-metronome') {
-            fermerModalMetronome();
-            return;
-        }
-        if (event.target.id === 'modal-dictaphone') {
-            fermerModalDictaphone();
-            return;
-        }
-        fermerModal(); 
-        fermerModalImage(); 
-        fermerModalRoutines(); 
-        fermerModalSaveRoutine(); 
-        if (typeof fermerModalPlaylist === 'function') fermerModalPlaylist(); 
-        if (typeof fermerModalSettings === 'function') fermerModalSettings();
-        if (typeof fermerTrieur === 'function') fermerTrieur();
-        if (typeof fermerModalMetronome === 'function') fermerModalMetronome();
-        if (typeof fermerModalAudioPlayer === 'function') fermerModalAudioPlayer();
-        if (typeof fermerModalDictaphone === 'function') fermerModalDictaphone();
-        if (typeof fermerModalCahierChoix === 'function') fermerModalCahierChoix();
-        if (typeof fermerModalCahierSave === 'function') fermerModalCahierSave();
+    if (event.target.classList.contains('modal')) {
+        const closeFn = MODAL_BACKDROP_CLOSERS[event.target.id];
+        if (closeFn) closeFn();
     }
-    if (event.target.id === 'modal-image-fullscreen') {
-        fermerModalImage();
-    }
-}
+};
 
 function toggleDropdown(id, event) {
     event.stopPropagation();
@@ -4537,7 +4536,7 @@ function renderRoutines() {
                 <div style="flex: 1; min-width: 200px;">
                     <span style="font-weight: 600; color: var(--text-primary); font-size: 15px; display: block; margin-bottom: 4px;">${routine.nom}</span>
                     <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
-                        <span class="badge-temps" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 2px 8px; font-size: 12px; min-width: auto; margin:0;">${tempsFormate}</span>
+                        <span class="badge-temps" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); padding: 2px 8px; font-size: 12px; min-width: 54px; margin:0;">${tempsFormate}</span>
                         <div>${badgesHtml}</div>
                     </div>
                 </div>

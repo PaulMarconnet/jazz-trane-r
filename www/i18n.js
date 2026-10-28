@@ -1545,7 +1545,7 @@ function appliquerTraductionsDOM() {
     setTitle('button[onclick="sauterAudioSecondes(-5)"]', 'audio.rewind_title');
     setTitle('#transcribe-btn-play-pause', 'audio.play_pause_title');
     setTitle('button[onclick="sauterAudioSecondes(5)"]', 'audio.forward_title');
-    const audioBoxTitles = document.querySelectorAll('#modal-audio-player div[style*="text-transform: uppercase"]');
+    const audioBoxTitles = document.querySelectorAll('#modal-audio-player .cadre-section-title');
     if (audioBoxTitles[0]) audioBoxTitles[0].textContent = t('audio.loop_section');
     if (audioBoxTitles[1]) audioBoxTitles[1].textContent = t('audio.speed_section');
     setTitle('#transcribe-btn-loop-toggle', 'audio.loop_toggle_title');

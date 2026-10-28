@@ -1,8 +1,15 @@
-const CACHE_NAME = 'jazz-traner-v30';
+const CACHE_NAME = 'jazz-traner-v31';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './style.css',
+    './i18n.js',
+    './modules/library-domain.js',
+    './modules/session-timer.js',
+    './modules/history-analytics.js',
+    './modules/score-navigation.js',
+    './modules/storage-repo.js',
+    './modules/system-host.js',
     './script.js',
     './libs/jszip.min.js',
     './libs/pdf.min.js',
@@ -41,6 +48,8 @@ self.addEventListener('fetch', (event) => {
     // Stratégie Network-First pour les scripts et pages principales pour garantir la fraîcheur du code
     const isAppCode = event.request.mode === 'navigate' || 
                       event.request.url.includes('script.js') || 
+                      event.request.url.includes('i18n.js') ||
+                      event.request.url.includes('/modules/') ||
                       event.request.url.includes('index.html') ||
                       event.request.url.includes('style.css');
 
