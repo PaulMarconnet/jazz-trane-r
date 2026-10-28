@@ -1449,9 +1449,8 @@ body.mode-pupitre .item-card { display: none !important; }
    ========================================== */
 
 .trieur-modal-content {
-    width: 95%; max-width: 1000px; height: 90vh; 
-    display: flex; flex-direction: column; padding: 20px;
-    background-color: var(--bg-color); /* Fond plus sombre pour l'immersion */
+    width: 95%; max-width: 580px; height: auto; max-height: 90vh; 
+    display: flex; flex-direction: column; padding: 22px;
 }
 
 .trieur-header {
@@ -1623,9 +1622,9 @@ body.mode-pupitre .item-card { display: none !important; }
 }
 
 .setting-cat-card {
-    background: var(--card-bg-elevated);
+    background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border-color);
-    border-radius: var(--card-radius);
+    border-radius: 12px;
     padding: 12px 16px;
     margin-bottom: 12px;
 }
@@ -2505,6 +2504,13 @@ input[type="range"]::-moz-range-thumb {
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
     color: var(--text-muted) !important;
+}
+
+/* Cadres unifiés dans les modales (Dictaphone, Métronome, Trieur Express, Paramètres) */
+.modal-cadre {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
 }
 
 /* Désactivation du focus collant sur les boutons après un tap tactile */
