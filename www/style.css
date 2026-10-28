@@ -1278,9 +1278,14 @@ button.badge-tempo.playing { color: var(--bg-color); background: var(--accent-am
     border: 2.5px solid var(--accent-secondary) !important;
     background-color: rgba(var(--accent-secondary-rgb), 0.12) !important;
 }
-.vocab-details { flex-grow: 1; margin-right: 16px; }
+.vocab-details { flex-grow: 1; margin-right: 16px; min-width: 0; }
 .vocab-title { font-family: var(--font-title); font-weight: 600; font-size: 15.5px; margin-bottom: 4px; display: block; color: var(--text-primary); }
+.vocab-attributs { font-size: 12.5px; color: var(--text-muted); margin-top: -1px; margin-bottom: 5px; line-height: 1.35; }
 .vocab-meta { font-size: 13px; color: var(--text-muted); }
+.item-menu-dropdown { right: 0; left: auto; min-width: 148px; z-index: 1200; }
+.item-menu-dropdown button { display: flex !important; align-items: center; gap: 8px; width: 100%; text-align: left; }
+.item-menu-dropdown button svg { width: 14px; height: 14px; flex-shrink: 0; }
+.item-menu-dropdown button.item-menu-delete { color: var(--accent-red) !important; }
 .vocab-image-thumb {
     width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);
     margin-right: 16px; cursor: pointer; background-color: var(--input-bg); flex-shrink: 0;

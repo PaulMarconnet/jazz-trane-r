@@ -338,131 +338,80 @@
 
     <!-- VUE BIBLIOTHÈQUE -->
     <div id="vue-bibliotheque" style="display: none;">
-        <div class="header-creation" style="flex-direction: row; justify-content: space-between; align-items: center;">
+        <div class="header-creation" style="flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <h2>Bibliothèque musicale</h2>
-            <button class="btn-action btn-ghost-red" onclick="reinitialiserBibliotheque()" style="font-size: 13px;">
-                <svg viewBox="0 0 24 24"
-                    style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 8px;">
-                    <path d="M3 6h18" />
-                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    <line x1="10" y1="11" x2="10" y2="17" />
-                    <line x1="14" y1="11" x2="14" y2="17" />
-                </svg> Réinitialiser
-            </button>
-        </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <!-- BOUTON + AJOUTER (Modale dédiée) -->
+                <button type="button" id="btn-open-modal-item" class="btn-action btn-ghost-green" style="font-size: 13px; height: 32px;"
+                    onclick="ouvrirModalItem()">
+                    <span>+ Ajouter</span>
+                </button>
 
-        <div class="form-section">
-            <div
-                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                <h3 style="margin: 0; border: none; padding: 0;">Ajouter à la bibliothèque</h3>
+                <!-- BOUTON IMPORTER ET TRIER (INBOX ZIP & MULTI-FICHIERS) -->
+                <button type="button" id="btn-inbox-zip-trigger" class="btn-action btn-ghost-neutral" style="font-size: 13px; height: 32px;"
+                    onclick="document.getElementById('input-zip-inbox').click()" title="Importer des fichiers (ZIP ou sélection multiple PDF/images) dans le Trieur Express">
+                    <svg viewBox="0 0 24 24"
+                        style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
+                        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                        <path
+                            d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                    </svg>
+                    <span>Importer et Trier</span>
+                </button>
+                <input type="file" id="input-zip-inbox" multiple accept=".zip,.pdf,application/zip,application/x-zip,application/x-zip-compressed,application/octet-stream,application/pdf,image/*,audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac" style="display: none;"
+                    onchange="traiterInboxZip(event)">
 
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <!-- BOUTON IMPORTER ET TRIER (INBOX ZIP & MULTI-FICHIERS) -->
-                    <button type="button" id="btn-inbox-zip-trigger" class="btn-action btn-ghost-neutral" style="font-size: 12px; height: 28px;"
-                        onclick="document.getElementById('input-zip-inbox').click()" title="Importer des fichiers (ZIP ou sélection multiple PDF/images) dans le Trieur Express">
-                        <svg viewBox="0 0 24 24"
-                            style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
-                            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-                            <path
-                                d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-                        </svg>
-                        <span>Importer et Trier</span>
-                    </button>
-                    <input type="file" id="input-zip-inbox" multiple accept=".zip,.pdf,application/zip,application/x-zip,application/x-zip-compressed,application/octet-stream,application/pdf,image/*,audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac" style="display: none;"
-                        onchange="traiterInboxZip(event)">
+                <!-- BOUTON IMPORT IREAL PRO -->
+                <button type="button" id="btn-biblio-ireal" class="btn-action btn-ghost-neutral" style="font-size: 13px; height: 32px;"
+                    onclick="document.getElementById('input-ireal-file').click()">
+                    <svg viewBox="0 0 24 24"
+                        style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>iReal Pro</span>
+                </button>
+                <input type="file" id="input-ireal-file" accept=".html,.htm,text/html,application/octet-stream" style="display: none;"
+                    onchange="importerBackupIRealPro(event)">
 
-                    <!-- BOUTON IMPORT IREAL PRO (Au bord droit) -->
-                    <button type="button" class="btn-action btn-ghost-neutral" style="font-size: 12px; height: 28px;"
-                        onclick="document.getElementById('input-ireal-file').click()">
-                        <svg viewBox="0 0 24 24"
-                            style="width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="7 10 12 15 17 10" />
-                            <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
-                        <span>iReal Pro</span>
-                    </button>
-                    <input type="file" id="input-ireal-file" accept=".html,.htm,text/html,application/octet-stream" style="display: none;"
-                        onchange="importerBackupIRealPro(event)">
+                <!-- BOUTON DICTAPHONE (Bibliothèque) -->
+                <button type="button" id="btn-biblio-dictaphone" class="btn-action btn-ghost-neutral btn-square"
+                    onclick="ouvrirModalDictaphone()" title="Dictaphone (Enregistreur)">
+                    <svg viewBox="0 0 24 24"
+                        style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="22"/>
+                    </svg>
+                </button>
 
-                    <!-- BOUTON DICTAPHONE (Bibliothèque) -->
-                    <button type="button" id="btn-biblio-dictaphone" class="btn-action btn-ghost-neutral btn-square"
-                        onclick="ouvrirModalDictaphone()" title="Dictaphone (Enregistreur)">
-                        <svg viewBox="0 0 24 24"
-                            style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
-                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                            <line x1="12" y1="19" x2="12" y2="22"/>
-                        </svg>
-                    </button>
+                <!-- BOUTON CAHIER DE MUSIQUE (Bibliothèque) -->
+                <button type="button" id="btn-biblio-cahier" class="btn-action btn-ghost-neutral btn-square"
+                    onclick="ouvrirNouveauCahierModal()" title="Cahier de musique manuscrit">
+                    <svg viewBox="0 0 24 24"
+                        style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
+                        <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
+                        <path d="M2 6h4"/>
+                        <path d="M2 10h4"/>
+                        <path d="M2 14h4"/>
+                        <path d="M2 18h4"/>
+                        <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+                    </svg>
+                </button>
 
-                    <!-- BOUTON CAHIER DE MUSIQUE (Bibliothèque) -->
-                    <button type="button" id="btn-biblio-cahier" class="btn-action btn-ghost-neutral btn-square"
-                        onclick="ouvrirNouveauCahierModal()" title="Cahier de musique manuscrit">
-                        <svg viewBox="0 0 24 24"
-                            style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
-                            <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
-                            <path d="M2 6h4"/>
-                            <path d="M2 10h4"/>
-                            <path d="M2 14h4"/>
-                            <path d="M2 18h4"/>
-                            <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
-                        </svg>
-                    </button>
-                </div>
+                <!-- BOUTON RÉINITIALISER -->
+                <button class="btn-action btn-ghost-red" onclick="reinitialiserBibliotheque()" style="font-size: 13px; height: 32px;">
+                    <svg viewBox="0 0 24 24"
+                        style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 6px;">
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg> Réinitialiser
+                </button>
             </div>
-
-            <form id="form-vocabulaire" onsubmit="ajouterVocabulaire(event)">
-                <div class="form-row" style="display: flex; gap: 16px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
-                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
-                        <label>Nom de l'élément</label>
-                        <input type="text" id="input-vocab-nom" placeholder="Nom..." required style="width: 100%;">
-                    </div>
-                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px; display: flex; gap: 8px;">
-                        <div style="flex: 1; min-width: 0;">
-                            <label>Catégorie</label>
-                            <select id="input-vocab-type" onchange="gererSousCategoriesForm()" style="width: 100%;">
-                                <!-- Généré dynamiquement en JS -->
-                            </select>
-                        </div>
-                        <div style="flex: 1; min-width: 0; display: none;" id="container-vocab-sous-cat">
-                            <label>Sous-catégorie</label>
-                            <select id="input-vocab-sous-type" style="width: 100%;"></select>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-row" style="display: flex; gap: 16px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
-                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
-                        <label>Partition associée</label>
-                        <input type="file" id="input-vocab-image" accept=".png, .jpeg, .jpg, .pdf" multiple style="display: none;" onchange="const l = document.getElementById('label-input-vocab-image'); if(l) l.textContent = this.files.length ? (this.files.length > 1 ? t('library.files_selected', { count: this.files.length }) : this.files[0].name) : t('library.no_file_chosen')">
-                        <div style="display: flex; align-items: center; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; height: 34px; box-sizing: border-box;" onclick="document.getElementById('input-vocab-image').click()">
-                            <span style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); color: var(--text-primary); padding: 3px 12px; border-radius: 4px; margin-right: 12px; font-size: 13px; font-weight: 500; white-space: nowrap;">Choisir des fichiers</span>
-                            <span id="label-input-vocab-image" style="font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Aucun fichier choisi</span>
-                        </div>
-                        <div id="info-current-score" style="display: none; align-items: center; justify-content: space-between; margin-top: 6px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;"></div>
-                    </div>
-                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
-                        <label>Audio associé</label>
-                        <input type="file" id="input-vocab-audio" accept="audio/*, .mp3, .wav, .m4a, .ogg, .webm" style="display: none;" onchange="const l = document.getElementById('label-input-vocab-audio'); if(l) l.textContent = this.files.length ? this.files[0].name : t('library.no_file_chosen')">
-                        <div style="display: flex; align-items: center; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; height: 34px; box-sizing: border-box;" onclick="document.getElementById('input-vocab-audio').click()">
-                            <span style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); color: var(--text-primary); padding: 3px 12px; border-radius: 4px; margin-right: 12px; font-size: 13px; font-weight: 500; white-space: nowrap;">Choisir un fichier</span>
-                            <span id="label-input-vocab-audio" style="font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Aucun fichier choisi</span>
-                        </div>
-                        <div id="info-current-audio" style="display: none; align-items: center; justify-content: space-between; margin-top: 6px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;"></div>
-                    </div>
-                </div>
-                <div class="action-container" id="container-btn-vocab">
-                    <button type="submit" class="btn-action btn-ghost-green" id="btn-submit-vocab">
-                        <svg viewBox="0 0 24 24"
-                            style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 8px;">
-                            <path d="M5 12h14" />
-                            <path d="M12 5v14" />
-                        </svg>
-                        Ajouter
-                    </button>
-                </div>
-            </form>
         </div>
 
         <div class="form-section">
@@ -918,6 +867,93 @@
             </div>
 
             <div id="concert-setlist-items" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;"></div>
+        </div>
+    </div>
+
+    <!-- MODALE D'AJOUT / ÉDITION D'UN ITEM DE BIBLIOTHÈQUE -->
+    <div id="modal-item" class="modal" style="display: none; z-index: 2100;">
+        <div class="modal-content" style="max-width: 620px; display: flex; flex-direction: column; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal" onclick="fermerModalItem()">&times;</span>
+            <h3 id="titre-modal-item" style="margin-top: 0; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                Ajouter à la bibliothèque
+            </h3>
+
+            <form id="form-vocabulaire" onsubmit="ajouterVocabulaire(event)">
+                <div class="form-row" style="display: flex; gap: 16px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
+                        <label id="label-vocab-nom" class="cadre-section-title">Titre</label>
+                        <input type="text" id="input-vocab-nom" placeholder="Titre..." required style="width: 100%;">
+                    </div>
+                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
+                        <label id="label-vocab-type" class="cadre-section-title">Catégorie</label>
+                        <select id="input-vocab-type" onchange="gererSousCategoriesForm()" style="width: 100%;">
+                            <!-- Généré dynamiquement en JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Sélection multi-puces des Sous-catégories / Setlists -->
+                <div id="container-vocab-sous-cat" style="display: none; margin-bottom: 14px;">
+                    <label id="label-vocab-sous-type" class="cadre-section-title">Sous-catégorie</label>
+                    <select id="input-vocab-sous-type" style="display: none;"></select>
+                    <div id="chips-vocab-sous-categories" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+
+                <!-- Les 4 Attributs d'item : compositeur, style, tonalite, tempo -->
+                <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="flex: 1 1 calc(50% - 6px); min-width: 180px;">
+                        <label id="label-vocab-compositeur" class="cadre-section-title">Compositeur / Artiste</label>
+                        <input type="text" id="input-vocab-compositeur" placeholder="Ex : Bill Evans" style="width: 100%;">
+                    </div>
+                    <div style="flex: 1 1 calc(50% - 6px); min-width: 180px;">
+                        <label id="label-vocab-style" class="cadre-section-title">Style</label>
+                        <input type="text" id="input-vocab-style" placeholder="Ex : Medium Swing, Waltz..." style="width: 100%;">
+                    </div>
+                </div>
+                <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="flex: 1 1 calc(50% - 6px); min-width: 140px;">
+                        <label id="label-vocab-tonalite" class="cadre-section-title">Tonalité</label>
+                        <input type="text" id="input-vocab-tonalite" placeholder="Ex : F, Cm, Bb..." style="width: 100%;">
+                    </div>
+                    <div style="flex: 1 1 calc(50% - 6px); min-width: 140px;">
+                        <label id="label-vocab-tempo" class="cadre-section-title">Tempo (BPM)</label>
+                        <input type="number" id="input-vocab-tempo" min="20" max="400" step="1" placeholder="Ex : 140" style="width: 100%;">
+                    </div>
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 16px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
+                        <label id="label-vocab-score" class="cadre-section-title">Partition associée</label>
+                        <input type="file" id="input-vocab-image" accept=".png, .jpeg, .jpg, .pdf" multiple style="display: none;" onchange="const l = document.getElementById('label-input-vocab-image'); if(l) l.textContent = this.files.length ? (this.files.length > 1 ? t('library.files_selected', { count: this.files.length }) : this.files[0].name) : t('library.no_file_chosen')">
+                        <div style="display: flex; align-items: center; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; height: 34px; box-sizing: border-box;" onclick="document.getElementById('input-vocab-image').click()">
+                            <span style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); color: var(--text-primary); padding: 3px 12px; border-radius: 4px; margin-right: 12px; font-size: 13px; font-weight: 500; white-space: nowrap;">Choisir des fichiers</span>
+                            <span id="label-input-vocab-image" style="font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Aucun fichier choisi</span>
+                        </div>
+                        <div id="info-current-score" style="display: none; align-items: center; justify-content: space-between; margin-top: 6px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;"></div>
+                    </div>
+                    <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
+                        <label id="label-vocab-audio" class="cadre-section-title">Audio associé</label>
+                        <input type="file" id="input-vocab-audio" accept="audio/*, .mp3, .wav, .m4a, .ogg, .webm" style="display: none;" onchange="const l = document.getElementById('label-input-vocab-audio'); if(l) l.textContent = this.files.length ? this.files[0].name : t('library.no_file_chosen')">
+                        <div style="display: flex; align-items: center; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; height: 34px; box-sizing: border-box;" onclick="document.getElementById('input-vocab-audio').click()">
+                            <span style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); color: var(--text-primary); padding: 3px 12px; border-radius: 4px; margin-right: 12px; font-size: 13px; font-weight: 500; white-space: nowrap;">Choisir un fichier</span>
+                            <span id="label-input-vocab-audio" style="font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Aucun fichier choisi</span>
+                        </div>
+                        <div id="info-current-audio" style="display: none; align-items: center; justify-content: space-between; margin-top: 6px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;"></div>
+                    </div>
+                </div>
+
+                <div class="action-container" id="container-btn-vocab" style="justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                    <button type="button" class="btn-action btn-ghost-neutral" id="btn-cancel-modal-item" onclick="fermerModalItem()">Annuler</button>
+                    <button type="submit" class="btn-action btn-ghost-green" id="btn-submit-vocab">
+                        <svg viewBox="0 0 24 24"
+                            style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 8px;">
+                            <path d="M5 12h14" />
+                            <path d="M12 5v14" />
+                        </svg>
+                        Ajouter
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

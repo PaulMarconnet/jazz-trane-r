@@ -6,10 +6,10 @@
 
 **Recommended model:** **Gemini 4 Argon (Medium)** — Chirurgie importante dans le monolithe et refonte de la vue Bibliothèque + création du premier grand module métier avec ses tests.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Le module `library-domain` est testé unitairement via `vitest` sur : la normalisation canonique d'un **Item** (incluant la migration transparente des anciens champs vers les 4 **Attributs d'item** `compositeur`, `style`, `tonalite`, `tempo`), l'exclusion automatique des styles iReal Pro hors de `sous_categories`, et l'algorithme de tirage du **Mode Immersif** (intersection Catégorie ∩ Favoris ∩ Setlists/Sous-catégories et tri multicritère).
-- [ ] La catégorie `Projets` / `Projects` est retirée des catégories par défaut FR/EN et toute référence en dur à d'anciennes sous-catégories personnelles (`aem`, `jazz 1460`) est supprimée.
-- [ ] En ouvrant la Bibliothèque, le premier **Cadre** permanent de formulaire a disparu : l'utilisateur voit immédiatement ses **Items**, et les boutons *+ Ajouter*, *Importer et Trier*, *iReal Pro*, *Dictaphone* et *Cahier* sont accessibles dans l'en-tête.
-- [ ] Cliquer sur *+ Ajouter* ou sur *Modifier* depuis le menu `⋮` d'un **Item** ouvre une modale dédiée permettant de saisir ou modifier le titre, la catégorie, les sous-catégories/**Setlists**, les 4 **Attributs d'item** (`compositeur`, `style`, `tonalite`, `tempo`), la partition et l'audio, sans faire remonter le défilement de la page.
-- [ ] Sur chaque carte d'**Item** dans la Bibliothèque, les boutons crayon et poubelle sont remplacés par un unique bouton `⋮` ouvrant le menu *Modifier / Supprimer*, et les **Attributs d'item** renseignés s'affichent sobrement sous le titre séparés par ` · ` (sans laisser d'espace vide lorsqu'ils sont absents).
+- [x] Le module `library-domain` est testé unitairement via `vitest` sur : la normalisation canonique d'un **Item** (incluant la migration transparente des anciens champs vers les 4 **Attributs d'item** `compositeur`, `style`, `tonalite`, `tempo`), l'exclusion automatique des styles iReal Pro hors de `sous_categories`, et l'algorithme de tirage du **Mode Immersif** (intersection Catégorie ∩ Favoris ∩ Setlists/Sous-catégories et tri multicritère).
+- [x] La catégorie `Projets` / `Projects` est retirée des catégories par défaut FR/EN et toute référence en dur à d'anciennes sous-catégories personnelles (`aem`, `jazz 1460`) est supprimée.
+- [x] En ouvrant la Bibliothèque, le premier **Cadre** permanent de formulaire a disparu : l'utilisateur voit immédiatement ses **Items**, et les boutons *+ Ajouter*, *Importer et Trier*, *iReal Pro*, *Dictaphone* et *Cahier* sont accessibles dans l'en-tête.
+- [x] Cliquer sur *+ Ajouter* ou sur *Modifier* depuis le menu `⋮` d'un **Item** ouvre une modale dédiée permettant de saisir ou modifier le titre, la catégorie, les sous-catégories/**Setlists**, les 4 **Attributs d'item** (`compositeur`, `style`, `tonalite`, `tempo`), la partition et l'audio, sans faire remonter le défilement de la page.
+- [x] Sur chaque carte d'**Item** dans la Bibliothèque, les boutons crayon et poubelle sont remplacés par un unique bouton `⋮` ouvrant le menu *Modifier / Supprimer*, et les **Attributs d'item** renseignés s'affichent sobrement sous le titre séparés par ` · ` (sans laisser d'espace vide lorsqu'ils sont absents).

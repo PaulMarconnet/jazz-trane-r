@@ -72,6 +72,9 @@ const IREAL_STYLES_A_IGNORER = new Set([
 ]);
 
 function estStyleIrealAFiltrer(texte) {
+    if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.isIrealStyle === 'function') {
+        return window.LibraryDomain.isIrealStyle(texte);
+    }
     if (!texte || typeof texte !== 'string') return false;
     const clean = texte.trim().toLowerCase();
     if (IREAL_STYLES_A_IGNORER.has(clean)) return true;
@@ -79,6 +82,9 @@ function estStyleIrealAFiltrer(texte) {
 }
 
 function estTonaliteValide(str) {
+    if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.isValidTonalite === 'function') {
+        return window.LibraryDomain.isValidTonalite(str);
+    }
     if (!str || typeof str !== 'string') return false;
     const clean = str.trim();
     if (estStyleIrealAFiltrer(clean)) return false;
@@ -90,35 +96,22 @@ async function migrerDonneesV3() {
     const items = await lireLocal('vocabulaire');
     let modifications = 0;
     for (let item of items) {
+        if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.normalizeItem === 'function') {
+            const normalized = window.LibraryDomain.normalizeItem(item);
+            if (JSON.stringify(normalized) !== JSON.stringify(item)) {
+                await ecrireLocal('vocabulaire', normalized, 'put');
+                modifications++;
+            }
+            continue;
+        }
         let changed = false;
         if (item.nom && !item.titre) {
             const typeItem = item.type_item === "Standards" || item.type_item === "Thèmes" ? "Morceaux" : item.type_item;
             item.titre = item.nom;
             delete item.nom;
             item.type_item = typeItem;
-            item.ireal_data = item.ireal_data || { grille: null, tona_origine: null, metrique: null };
+            item.ireal_data = item.ireal_data || { grille: null, tona_origine: null };
             item.stats = item.stats || { nb_pratiques: item.nb_pratiques || 0, date_derniere_pratique: null };
-            changed = true;
-        }
-
-        // Nettoyage automatique des badges et styles iReal résiduels dans les données locales
-        if (item.tonalite && (estStyleIrealAFiltrer(item.tonalite) || !estTonaliteValide(item.tonalite))) {
-            delete item.tonalite;
-            changed = true;
-        }
-        if (item.ireal_data && item.ireal_data.tona_origine && (estStyleIrealAFiltrer(item.ireal_data.tona_origine) || !estTonaliteValide(item.ireal_data.tona_origine))) {
-            item.ireal_data.tona_origine = null;
-            changed = true;
-        }
-        if (Array.isArray(item.sous_categories)) {
-            const scNettoyees = item.sous_categories.filter(sc => !estStyleIrealAFiltrer(sc));
-            if (scNettoyees.length !== item.sous_categories.length) {
-                item.sous_categories = scNettoyees;
-                changed = true;
-            }
-        }
-        if (item.sous_categorie && estStyleIrealAFiltrer(item.sous_categorie)) {
-            item.sous_categorie = "";
             changed = true;
         }
 
@@ -254,13 +247,32 @@ async function apiFetch(endpoint, options = {}) {
             parsedBody.fichier_audio = null;
         }
         if (options.body.get('supprimer_partition') === 'true') {
-            parsedBody.fichier_image = null;
+            parsedBody.fichier_image = [];
         }
+        if (parsedBody.sous_categories_json !== undefined) {
+            try {
+                const parsedSc = JSON.parse(parsedBody.sous_categories_json);
+                if (Array.isArray(parsedSc)) parsedBody.sous_categories = parsedSc;
+            } catch (e) { }
+            delete parsedBody.sous_categories_json;
+        }
+        parsedBody.attributs = {
+            compositeur: parsedBody.compositeur || null,
+            style: parsedBody.style || null,
+            tonalite: parsedBody.tonalite || null,
+            tempo: parsedBody.tempo || null
+        };
         delete parsedBody.supprimer_audio;
         delete parsedBody.supprimer_partition;
     }
 
-    if (method === 'GET') { return await lireLocal(resource) || []; }
+    if (method === 'GET') {
+        const list = await lireLocal(resource) || [];
+        if (resource === 'vocabulaire' && typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.normalizeItem === 'function') {
+            return list.map(item => window.LibraryDomain.normalizeItem(item));
+        }
+        return list;
+    }
     if (method === 'DELETE') {
         if (id === 'reset') {
             await viderStore(resource);
@@ -329,10 +341,13 @@ async function apiFetch(endpoint, options = {}) {
         parsedBody.id = Date.now() + Math.floor(Math.random() * 1000000);
         if (resource === 'seances') parsedBody.statut = 'en_cours';
         if (resource === 'vocabulaire') {
-            parsedBody.titre = parsedBody.nom || parsedBody.titre; delete parsedBody.nom;
-            parsedBody.stats = { nb_pratiques: 0, date_derniere_pratique: null };
-            parsedBody.ireal_data = { grille: null, tona_origine: null, metrique: null };
-            parsedBody.spotify_uri = null; parsedBody.youtube_url = null;
+            if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.normalizeItem === 'function') {
+                parsedBody = window.LibraryDomain.normalizeItem(parsedBody);
+            } else {
+                parsedBody.titre = parsedBody.nom || parsedBody.titre; delete parsedBody.nom;
+                parsedBody.stats = { nb_pratiques: 0, date_derniere_pratique: null };
+                parsedBody.ireal_data = { grille: null, tona_origine: null };
+            }
         }
         await ecrireLocal(resource, parsedBody); return parsedBody;
     }
@@ -347,42 +362,21 @@ async function apiFetch(endpoint, options = {}) {
             const itemExistant = existants.find(i => i.id === parsedBody.id);
 
             if (itemExistant) {
-                // 2. Fusion : on préserve l'existant (stats, favoris, ireal_data, image) 
-                // et on écrase uniquement avec les champs modifiés
-                let itemMisAJour = { ...itemExistant, ...parsedBody };
-
-                // 3. Gestion spécifique du Formulaire d'édition
                 if (options.body instanceof FormData) {
-                    // Si le champ fichier est vide et qu'on n'a pas demandé la suppression, on force la conservation de l'ancienne image
-                    if (!parsedBody.fichier_image && options.body.get && options.body.get('supprimer_partition') === 'true') {
-                        itemMisAJour.fichier_image = null;
-                    } else if (!parsedBody.fichier_image) {
-                        itemMisAJour.fichier_image = itemExistant.fichier_image;
+                    if (parsedBody.fichier_image === undefined && (!options.body.get || options.body.get('supprimer_partition') !== 'true')) {
+                        parsedBody.fichier_image = itemExistant.fichier_image;
                     }
-
-                    // Si le champ audio n'a pas été fourni et qu'on n'a pas demandé la suppression, on conserve l'ancien audio
-                    if (!parsedBody.fichier_audio && options.body.get && options.body.get('supprimer_audio') === 'true') {
-                        itemMisAJour.fichier_audio = null;
-                    } else if (parsedBody.fichier_audio === undefined && (!options.body.get || options.body.get('supprimer_audio') !== 'true')) {
-                        itemMisAJour.fichier_audio = itemExistant.fichier_audio;
+                    if (parsedBody.fichier_audio === undefined && (!options.body.get || options.body.get('supprimer_audio') !== 'true')) {
+                        parsedBody.fichier_audio = itemExistant.fichier_audio;
                     }
-
-                    // On fusionne les sous-catégories sans écraser les Playlists associées
-                    let ancSc = itemExistant.sous_categories || [];
-                    if (!Array.isArray(ancSc)) ancSc = [itemExistant.sous_categorie].filter(Boolean);
-
-                    const nvlleSc = parsedBody.sous_categorie;
-                    if (itemExistant.sous_categorie) {
-                        ancSc = ancSc.filter(sc => sc !== itemExistant.sous_categorie);
-                    }
-                    if (nvlleSc) {
-                        ancSc = [nvlleSc, ...ancSc.filter(sc => sc !== nvlleSc)];
-                    }
-                    itemMisAJour.sous_categories = ancSc;
-                    itemMisAJour.sous_categorie = nvlleSc;
                 }
-
-                parsedBody = itemMisAJour;
+                if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.applyItemUpdate === 'function') {
+                    parsedBody = window.LibraryDomain.applyItemUpdate(itemExistant, parsedBody);
+                } else {
+                    parsedBody = { ...itemExistant, ...parsedBody };
+                }
+            } else if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.normalizeItem === 'function') {
+                parsedBody = window.LibraryDomain.normalizeItem(parsedBody);
             }
         }
 
@@ -596,7 +590,6 @@ const CATEGORIES_DEFAUT = (typeof getCategoriesDefautPourLangue === 'function')
         "Patterns": ["Majeur", "Mineur", "Dominante", "Pentatonique", "Diminué", "Autres"],
         "Licks": ["II V I majeur", "II V I mineur", "I VI II V", "Blues", "Autres"],
         "Morceaux": [],
-        "Projets": [],
         "Relevés": [],
         "Technique": ["Gammes majeures", "Gammes mineures", "Gammes dominantes", "Hanon", "Autres"]
     };
@@ -616,6 +609,8 @@ function chargerCategoriesConfig() {
             const parsed = JSON.parse(stocke);
             if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
                 delete parsed['Concert'];
+                delete parsed['Projets'];
+                delete parsed['Projects'];
                 SOUS_CATEGORIES = parsed;
                 if (typeof window !== 'undefined') window.SOUS_CATEGORIES = SOUS_CATEGORIES;
                 return SOUS_CATEGORIES;
@@ -3988,7 +3983,8 @@ const MODAL_BACKDROP_CLOSERS = {
     'modal-trieur': () => typeof fermerTrieur === 'function' && fermerTrieur(),
     'modal-cahier-choix': () => typeof fermerModalCahierChoix === 'function' && fermerModalCahierChoix(),
     'modal-cahier-save': () => typeof fermerModalCahierSave === 'function' && fermerModalCahierSave(),
-    'modal-concert-setlist': () => typeof fermerSetlistDrawer === 'function' && fermerSetlistDrawer()
+    'modal-concert-setlist': () => typeof fermerSetlistDrawer === 'function' && fermerSetlistDrawer(),
+    'modal-item': () => typeof fermerModalItem === 'function' && fermerModalItem()
 };
 
 window.onclick = function (event) {
@@ -4031,17 +4027,7 @@ async function toggleFavori(id, event) {
             const qIdx = currentShuffleQueue.findIndex(i => i.id === id);
             if (qIdx !== -1) {
                 currentShuffleQueue[qIdx].favori = data.favori;
-                currentShuffleQueue.sort((a, b) => {
-                    const isFavA = (a.favori === true || a.favori === "true" || a.favori === 1) ? 1 : 0;
-                    const isFavB = (b.favori === true || b.favori === "true" || b.favori === 1) ? 1 : 0;
-                    if (isFavA !== isFavB) return isFavB - isFavA;
-                    const pratA = parseInt(a.stats ? a.stats.nb_pratiques : (a.nb_pratiques || 0), 10);
-                    const pratB = parseInt(b.stats ? b.stats.nb_pratiques : (b.nb_pratiques || 0), 10);
-                    if (pratA !== pratB) return pratA - pratB;
-                    const dateA = a.stats && a.stats.date_derniere_pratique ? new Date(a.stats.date_derniere_pratique).getTime() : 0;
-                    const dateB = b.stats && b.stats.date_derniere_pratique ? new Date(b.stats.date_derniere_pratique).getTime() : 0;
-                    return dateA - dateB;
-                });
+                currentShuffleQueue = window.LibraryDomain.sortImmersiveQueue(currentShuffleQueue);
             }
             renderShuffleCard();
         }
@@ -4071,26 +4057,76 @@ function setSort(context, sortValue) {
     }
 }
 
-function gererSousCategoriesForm() {
+let itemModalSelectedSousCats = new Set();
+
+function gererSousCategoriesForm(preserveSelection = false) {
     const typeSelect = document.getElementById('input-vocab-type');
     const sousCatContainer = document.getElementById('container-vocab-sous-cat');
     const sousCatSelect = document.getElementById('input-vocab-sous-type');
+    const sousCatLabel = document.getElementById('label-vocab-sous-type');
+    const chipsBox = document.getElementById('chips-vocab-sous-categories');
 
     if (!typeSelect || !sousCatContainer || !sousCatSelect) return;
 
     const categorie = typeSelect.value;
-    const listeSousCategories = getSousCategoriesPour(categorie);
+    const isMorceaux = typeof estCategorieMorceaux === 'function' ? estCategorieMorceaux(categorie) : (categorie === 'Morceaux');
+    if (sousCatLabel) {
+        sousCatLabel.textContent = isMorceaux ? t('library.setlists_subcat_label') : t('library.subcategory_label');
+    }
 
-    if (listeSousCategories && listeSousCategories.length > 0) {
-        sousCatSelect.innerHTML = '';
-        listeSousCategories.forEach(sc => {
-            sousCatSelect.innerHTML += `<option value="${sc}">${sc}</option>`;
+    if (!preserveSelection) {
+        itemModalSelectedSousCats.clear();
+    }
+
+    const listeSousCategories = getSousCategoriesPour(categorie);
+    const unionList = Array.from(new Set([...(listeSousCategories || []), ...Array.from(itemModalSelectedSousCats)]));
+
+    if (unionList.length > 0) {
+        const noneLabel = t('library.none_subcat');
+        sousCatSelect.innerHTML = `<option value="">— ${noneLabel} —</option>`;
+        unionList.forEach(sc => {
+            const safeVal = sc.replace(/"/g, '&quot;');
+            sousCatSelect.innerHTML += `<option value="${safeVal}">${sc}</option>`;
         });
+        sousCatSelect.value = Array.from(itemModalSelectedSousCats)[0] || '';
         sousCatContainer.style.display = 'block';
+
+        if (chipsBox) {
+            chipsBox.innerHTML = '';
+            unionList.forEach(sc => {
+                const isAct = itemModalSelectedSousCats.has(sc);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `chip btn-action ${isAct ? 'btn-ghost-blue active' : 'btn-ghost-neutral'}`;
+                btn.style.fontSize = '12px';
+                btn.style.height = '28px';
+                btn.style.padding = '0 10px';
+                btn.textContent = sc;
+                btn.onclick = () => toggleItemModalSousCatChip(sc);
+                chipsBox.appendChild(btn);
+            });
+        }
     } else {
         sousCatSelect.innerHTML = '';
         sousCatContainer.style.display = 'none';
+        if (chipsBox) {
+            chipsBox.innerHTML = '';
+        }
     }
+}
+
+function toggleItemModalSousCatChip(sc) {
+    if (!sc) return;
+    if (itemModalSelectedSousCats.has(sc)) {
+        itemModalSelectedSousCats.delete(sc);
+    } else {
+        itemModalSelectedSousCats.add(sc);
+    }
+    const sousCatSelect = document.getElementById('input-vocab-sous-type');
+    if (sousCatSelect) {
+        sousCatSelect.value = Array.from(itemModalSelectedSousCats)[0] || '';
+    }
+    gererSousCategoriesForm(true);
 }
 
 function estItemFavori(item) {
@@ -4148,18 +4184,16 @@ function initBibliothequeUI() {
 function getSousCategoriesPour(categorie) {
     let liste = [];
     if (typeof estCategorieMorceaux === 'function' ? estCategorieMorceaux(categorie) : categorie === 'Morceaux') {
-        const setlists = new Set();
-        vocabulaireCache.forEach(item => {
-            if (typeof estCategorieMorceaux === 'function' ? estCategorieMorceaux(item.type_item) : item.type_item === 'Morceaux') {
-                if (Array.isArray(item.sous_categories)) {
-                    item.sous_categories.forEach(sc => {
-                        if (!estStyleIrealAFiltrer(sc)) setlists.add(sc);
-                    });
-                } else if (item.sous_categorie && !estStyleIrealAFiltrer(item.sous_categorie)) {
-                    setlists.add(item.sous_categorie);
-                }
-            }
-        });
+        const setlistsFromItems = (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.getSetlists === 'function')
+            ? window.LibraryDomain.getSetlists(vocabulaireCache)
+            : [];
+        const setlists = new Set(setlistsFromItems);
+        const catMorceaux = typeof getNomCategorieMorceaux === 'function' ? getNomCategorieMorceaux(SOUS_CATEGORIES) : 'Morceaux';
+        if (Array.isArray(SOUS_CATEGORIES[catMorceaux])) {
+            SOUS_CATEGORIES[catMorceaux].forEach(sc => {
+                if (sc && !estStyleIrealAFiltrer(sc)) setlists.add(sc);
+            });
+        }
         liste = Array.from(setlists).sort();
     } else if (SOUS_CATEGORIES[categorie]) { liste = SOUS_CATEGORIES[categorie]; }
     return liste;
@@ -4168,13 +4202,68 @@ function getSousCategoriesPour(categorie) {
 let vocabulaireSupprimerScoreFlag = false;
 let vocabulaireSupprimerAudioFlag = false;
 
+function ouvrirModalItem(id = null) {
+    annulerEdition(false);
+    const modal = document.getElementById('modal-item');
+    const titleEl = document.getElementById('titre-modal-item');
+
+    if (id !== null && id !== undefined) {
+        const item = (typeof vocabulaireCache !== 'undefined' && Array.isArray(vocabulaireCache))
+            ? vocabulaireCache.find(i => Number(i.id) === Number(id))
+            : null;
+        if (item) {
+            remplirFormulaireEditionItem(item);
+            if (titleEl) titleEl.textContent = t('library.modal_edit_title');
+        }
+    } else {
+        if (titleEl) titleEl.textContent = t('library.modal_add_title');
+        const selectType = document.getElementById('input-vocab-type');
+        if (selectType) {
+            const defCat = typeof getCategorieParDefaut === 'function' ? getCategorieParDefaut() : selectType.options[0]?.value;
+            if (defCat && Array.from(selectType.options).some(o => o.value === defCat)) {
+                selectType.value = defCat;
+            }
+        }
+        itemModalSelectedSousCats.clear();
+        gererSousCategoriesForm(false);
+    }
+
+    if (modal) modal.style.display = 'flex';
+}
+
+function fermerModalItem() {
+    const modal = document.getElementById('modal-item');
+    if (modal) modal.style.display = 'none';
+    annulerEdition(false);
+}
+
 async function ajouterVocabulaire(event) {
-    event.preventDefault(); const btn = document.getElementById('btn-submit-vocab'); const originalText = btn.innerHTML;
-    btn.disabled = true; btn.innerHTML = t('common.processing');
+    event.preventDefault();
+    const btn = document.getElementById('btn-submit-vocab');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = t('common.processing');
+
     const formData = new FormData();
-    formData.append('nom', document.getElementById('input-vocab-nom').value); formData.append('type_item', document.getElementById('input-vocab-type').value);
-    const sousCat = document.getElementById('input-vocab-sous-type').value; if (sousCat) formData.append('sous_categorie', sousCat);
-    
+    formData.append('nom', document.getElementById('input-vocab-nom').value);
+    formData.append('type_item', document.getElementById('input-vocab-type').value);
+
+    // Sous-catégories / Setlists : puces cochées
+    const selectedSc = new Set(itemModalSelectedSousCats);
+    const scArray = Array.from(selectedSc).filter(Boolean);
+    formData.append('sous_categories_json', JSON.stringify(scArray));
+    if (scArray[0]) formData.append('sous_categorie', scArray[0]);
+
+    // Les 4 Attributs d'item : compositeur, style, tonalite, tempo
+    const compInput = document.getElementById('input-vocab-compositeur');
+    const styleInput = document.getElementById('input-vocab-style');
+    const tonaInput = document.getElementById('input-vocab-tonalite');
+    const tempoInput = document.getElementById('input-vocab-tempo');
+    formData.append('compositeur', compInput ? compInput.value.trim() : '');
+    formData.append('style', styleInput ? styleInput.value.trim() : '');
+    formData.append('tonalite', tonaInput ? tonaInput.value.trim() : '');
+    formData.append('tempo', tempoInput ? tempoInput.value.trim() : '');
+
     // Fichiers de partition ou médias
     const fileInput = document.getElementById('input-vocab-image');
     if (fileInput && fileInput.files.length > 0) {
@@ -4203,11 +4292,21 @@ async function ajouterVocabulaire(event) {
     }
 
     try {
-        const method = editVocabId ? 'PUT' : 'POST'; const url = editVocabId ? `/vocabulaire/${editVocabId}` : `/vocabulaire`;
+        const scrollBefore = window.scrollY;
+        const method = editVocabId ? 'PUT' : 'POST';
+        const url = editVocabId ? `/vocabulaire/${editVocabId}` : `/vocabulaire`;
         await apiFetch(url, { method: method, body: formData });
-        btn.innerHTML = `${svgSaveCheck} ${t('common.saved')}`; btn.className = 'btn-action done';
-        setTimeout(() => { annulerEdition(); chargerVocabulaireApi(); }, 1200);
-    } catch (err) { btn.disabled = false; btn.innerHTML = originalText; }
+        btn.innerHTML = `${svgSaveCheck} ${t('common.saved')}`;
+        btn.className = 'btn-action done';
+        await chargerVocabulaireApi(true);
+        window.scrollTo({ top: scrollBefore, behavior: 'instant' });
+        setTimeout(() => {
+            fermerModalItem();
+        }, 450);
+    } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
 }
 
 function trierVocabulaire(items, tri) {
@@ -4260,11 +4359,13 @@ function genererMediaHtml(item) {
     }
 }
 
-async function chargerVocabulaireApi() {
+async function chargerVocabulaireApi(preserveScroll = false) {
     try {
+        const prevRendered = currentBiblioRendered;
         let vocab = await apiFetch(`/vocabulaire`);
         if (!Array.isArray(vocab)) vocab = [];
-        vocabulaireCache = vocab; renderBibliotheque();
+        vocabulaireCache = vocab;
+        renderBibliotheque(preserveScroll ? Math.max(BIBLIO_CHUNK_SIZE, prevRendered) : BIBLIO_CHUNK_SIZE);
     } catch (e) { }
 }
 
@@ -4279,6 +4380,11 @@ function itemCorrespondRecherche(item, query) {
     const q = normaliserTexteRecherche(query).trim();
     if (!q) return true;
     if (normaliserTexteRecherche(item.titre).includes(q)) return true;
+    if (item.attributs) {
+        if (item.attributs.compositeur && normaliserTexteRecherche(item.attributs.compositeur).includes(q)) return true;
+        if (item.attributs.style && normaliserTexteRecherche(item.attributs.style).includes(q)) return true;
+        if (item.attributs.tonalite && normaliserTexteRecherche(item.attributs.tonalite).includes(q)) return true;
+    }
     const scVisibles = Array.isArray(item.sous_categories)
         ? item.sous_categories.filter(sc => !estStyleIrealAFiltrer(sc))
         : (item.sous_categorie && !estStyleIrealAFiltrer(item.sous_categorie) ? [item.sous_categorie] : []);
@@ -4286,7 +4392,7 @@ function itemCorrespondRecherche(item, query) {
     return false;
 }
 
-function renderBibliotheque() {
+function renderBibliotheque(initialChunkSize = BIBLIO_CHUNK_SIZE) {
     let items = currentFilterBiblio === "Toutes" ? [...vocabulaireCache] : vocabulaireCache.filter(i => i.type_item === currentFilterBiblio);
     if (showFavBiblio) items = items.filter(i => i.favori);
     if (searchQueryBiblio) items = items.filter(i => itemCorrespondRecherche(i, searchQueryBiblio));
@@ -4299,7 +4405,7 @@ function renderBibliotheque() {
     if (biblioObserver) biblioObserver.disconnect();
 
     const sentinel = document.createElement('div'); sentinel.id = 'biblio-sentinel'; sentinel.style.height = '20px'; sentinel.style.width = '100%';
-    renderBiblioChunk(); container.appendChild(sentinel);
+    renderBiblioChunk(initialChunkSize); container.appendChild(sentinel);
 
     biblioObserver = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && currentBiblioRendered < currentBiblioItems.length) { renderBiblioChunk(); }
@@ -4307,13 +4413,28 @@ function renderBibliotheque() {
     biblioObserver.observe(sentinel);
 }
 
-function renderBiblioChunk() {
+function formaterAttributsItemUI(item) {
+    if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.formatItemAttributes === 'function') {
+        return window.LibraryDomain.formatItemAttributes(item, {
+            formatTonalite: typeof formatTonalite === 'function' ? formatTonalite : null
+        });
+    }
+    return '';
+}
+
+function renderBiblioChunk(chunkSize = BIBLIO_CHUNK_SIZE) {
     const container = document.getElementById('liste-vocabulaire'); const sentinel = document.getElementById('biblio-sentinel');
     const fragment = document.createDocumentFragment();
-    const itemsToRender = currentBiblioItems.slice(currentBiblioRendered, currentBiblioRendered + BIBLIO_CHUNK_SIZE);
+    const itemsToRender = currentBiblioItems.slice(currentBiblioRendered, currentBiblioRendered + chunkSize);
+
+    const svgDotsVertical = `<svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>`;
 
     itemsToRender.forEach(item => {
-        const imageHtml = genererMediaHtml(item); const titreItem = item.titre || t('common.untitled'); const nomSafe = titreItem.replace(/'/g, "\\'");
+        const imageHtml = genererMediaHtml(item);
+        const titreItem = item.titre || t('common.untitled');
+        const attrsText = formaterAttributsItemUI(item);
+        const attrsHtml = attrsText ? `<div class="vocab-attributs">${attrsText}</div>` : '';
+
         let badgesHtml = "";
         const scNettoyees = (item.sous_categories && Array.isArray(item.sous_categories))
             ? item.sous_categories.filter(sc => !estStyleIrealAFiltrer(sc))
@@ -4324,7 +4445,6 @@ function renderBiblioChunk() {
         const favBtnClass = item.favori ? "btn-action btn-ghost-amber btn-square" : "btn-action btn-ghost-neutral btn-square";
         const favIcon = item.favori ? svgStarFilled : svgStarOutline;
         const nbPratiques = item.stats ? item.stats.nb_pratiques : (item.nb_pratiques || 0);
-        const paramEdition = item.sous_categories ? item.sous_categories[0] : (item.sous_categorie || "");
 
         const isAudioPlayingItem = (typeof transcribeState !== 'undefined' && Number(transcribeState.currentItemId) === Number(item.id) && transcribeState.isPlaying);
         const audioBtnHtml = item.fichier_audio ? `<button class="btn-action ${isAudioPlayingItem ? 'btn-ghost-blue active' : 'btn-ghost-neutral'} btn-square btn-card-audio" data-item-id="${item.id}" onclick="ouvrirLecteurAudioItem(${item.id}, event)" title="${t('library.listen_audio_title')}">${isAudioPlayingItem ? svgPause : svgAudioPlay}</button>` : '';
@@ -4334,6 +4454,7 @@ function renderBiblioChunk() {
             ${imageHtml}
             <div class="vocab-details">
                 <span class="vocab-title">${titreItem}</span>
+                ${attrsHtml}
                 <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
                     <span class="vocab-meta badge" style="border-color: var(--accent-blue); color: var(--accent-blue);">${item.type_item}</span>${badgesHtml}
                 </div>
@@ -4341,11 +4462,16 @@ function renderBiblioChunk() {
                     <div class="vocab-meta">${t('library.practiced_count', { count: nbPratiques })}</div>
                 </div>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
                 ${audioBtnHtml}
                 <button class="${favBtnClass}" onclick="toggleFavori(${item.id}, event)" title="${t('common.favorite')}">${favIcon}</button>
-                <button class="btn-action btn-ghost-neutral btn-square" onclick="editerVocabulaire(${item.id}, '${nomSafe}', '${item.type_item}', '${paramEdition}')" title="${t('common.edit')}">${svgPencil}</button>
-                <button class="btn-action btn-ghost-red btn-square" onclick="supprimerVocabulaire(${item.id})" title="${t('common.delete')}">${svgTrash}</button>
+                <div class="dropdown" id="dd-item-menu-${item.id}">
+                    <button type="button" class="btn-action btn-ghost-neutral btn-square btn-item-menu" onclick="toggleDropdown('dd-item-menu-${item.id}', event)" title="${t('common.options')}">${svgDotsVertical}</button>
+                    <div class="dropdown-content item-menu-dropdown">
+                        <button type="button" onclick="fermerTousLesDropdowns(); ouvrirModalItem(${item.id})">${svgPencil}<span>${t('common.edit')}</span></button>
+                        <button type="button" class="item-menu-delete" onclick="fermerTousLesDropdowns(); supprimerVocabulaire(${item.id})">${svgTrash}<span>${t('common.delete')}</span></button>
+                    </div>
+                </div>
             </div>`;
         fragment.appendChild(card);
     });
@@ -4355,13 +4481,16 @@ function renderBiblioChunk() {
     setTimeout(() => loadLazyImages('liste-vocabulaire'), 50);
 }
 
-
-function editerVocabulaire(id, nom, type, sousCat) {
-    editVocabId = id; 
+function remplirFormulaireEditionItem(item) {
+    editVocabId = item.id;
     vocabulaireSupprimerAudioFlag = false;
     vocabulaireSupprimerScoreFlag = false;
-    document.getElementById('input-vocab-nom').value = nom; 
+
+    const nomInput = document.getElementById('input-vocab-nom');
+    if (nomInput) nomInput.value = item.titre || '';
+
     const selectType = document.getElementById('input-vocab-type');
+    const type = item.type_item || 'Morceaux';
     if (type && selectType && !Array.from(selectType.options).some(o => o.value === type)) {
         const opt = document.createElement('option');
         opt.value = type;
@@ -4369,16 +4498,30 @@ function editerVocabulaire(id, nom, type, sousCat) {
         selectType.appendChild(opt);
     }
     if (selectType) selectType.value = type;
-    gererSousCategoriesForm(); 
-    if (sousCat) document.getElementById('input-vocab-sous-type').value = sousCat;
+
+    const scList = Array.isArray(item.sous_categories)
+        ? item.sous_categories.filter(sc => !estStyleIrealAFiltrer(sc))
+        : (item.sous_categorie && !estStyleIrealAFiltrer(item.sous_categorie) ? [item.sous_categorie] : []);
+    itemModalSelectedSousCats = new Set(scList);
+    gererSousCategoriesForm(true);
+
+    // Remplissage des 4 Attributs d'item
+    const attr = item.attributs || {};
+    const compInput = document.getElementById('input-vocab-compositeur');
+    const styleInput = document.getElementById('input-vocab-style');
+    const tonaInput = document.getElementById('input-vocab-tonalite');
+    const tempoInput = document.getElementById('input-vocab-tempo');
+    if (compInput) compInput.value = attr.compositeur || '';
+    if (styleInput) styleInput.value = attr.style || '';
+    if (tonaInput) tonaInput.value = attr.tonalite || '';
+    if (tempoInput) tempoInput.value = (attr.tempo !== null && attr.tempo !== undefined) ? attr.tempo : '';
 
     // Affichage des informations sur les médias actuels
-    const item = (typeof vocabulaireCache !== 'undefined' && Array.isArray(vocabulaireCache)) ? vocabulaireCache.find(i => Number(i.id) === Number(id)) : null;
     const infoScore = document.getElementById('info-current-score');
     const infoAudio = document.getElementById('info-current-audio');
 
     if (infoScore) {
-        if (item && item.fichier_image && (Array.isArray(item.fichier_image) ? item.fichier_image.length > 0 : true)) {
+        if (item.fichier_image && (Array.isArray(item.fichier_image) ? item.fichier_image.length > 0 : true)) {
             const count = Array.isArray(item.fichier_image) ? item.fichier_image.length : 1;
             const rawName = Array.isArray(item.fichier_image) ? item.fichier_image[0] : item.fichier_image;
             const cleanName = typeof rawName === 'string' ? rawName.replace(/^(score_\d+_|pdf_\d+_)/, '') : t('common.file');
@@ -4399,7 +4542,7 @@ function editerVocabulaire(id, nom, type, sousCat) {
     }
 
     if (infoAudio) {
-        if (item && item.fichier_audio) {
+        if (item.fichier_audio) {
             const rawName = item.fichier_audio;
             const cleanName = typeof rawName === 'string' ? rawName.replace(/^audio_\d+_/, '') : t('common.file');
             const audioTxt = t('library.audio_linked_info', { name: cleanName });
@@ -4418,15 +4561,11 @@ function editerVocabulaire(id, nom, type, sousCat) {
         }
     }
 
-    const btn = document.getElementById('btn-submit-vocab'); btn.innerHTML = `${svgSave} ${t('common.save')}`; btn.className = 'btn-action btn-ghost-green';
-    if (!document.getElementById('btn-cancel-edit')) {
-        const cancelBtn = document.createElement('button'); cancelBtn.type = 'button'; cancelBtn.id = 'btn-cancel-edit';
-        cancelBtn.className = 'btn-action btn-ghost-neutral'; cancelBtn.innerText = t('common.cancel'); cancelBtn.onclick = annulerEdition;
-        document.getElementById('container-btn-vocab').appendChild(cancelBtn);
-    } else {
-        document.getElementById('btn-cancel-edit').innerText = t('common.cancel');
+    const btn = document.getElementById('btn-submit-vocab');
+    if (btn) {
+        btn.innerHTML = `${svgSave} ${t('common.save')}`;
+        btn.className = 'btn-action btn-ghost-green';
     }
-    document.getElementById('form-vocabulaire').scrollIntoView({ behavior: 'smooth' });
 }
 
 function marquerSuppressionScoreEdite() {
@@ -4484,25 +4623,41 @@ function annulerSuppressionAudioEdite() {
     }
 }
 
-function annulerEdition() {
+function annulerEdition(closeModal = false) {
     editVocabId = null;
     vocabulaireSupprimerScoreFlag = false;
     vocabulaireSupprimerAudioFlag = false;
-    document.getElementById('form-vocabulaire').reset();
+    itemModalSelectedSousCats.clear();
+    const formEl = document.getElementById('form-vocabulaire');
+    if (formEl) formEl.reset();
     const lblScore = document.getElementById('label-input-vocab-image'); if (lblScore) lblScore.textContent = t('library.no_file_chosen');
     const lblAudio = document.getElementById('label-input-vocab-audio'); if (lblAudio) lblAudio.textContent = t('library.no_file_chosen');
     const infoScore = document.getElementById('info-current-score');
     if (infoScore) { infoScore.style.display = 'none'; infoScore.innerHTML = ''; }
     const infoAudio = document.getElementById('info-current-audio');
     if (infoAudio) { infoAudio.style.display = 'none'; infoAudio.innerHTML = ''; }
-    gererSousCategoriesForm();
-    const btn = document.getElementById('btn-submit-vocab'); btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 8px;"><path d="M5 12h14"/><path d="M12 5v14"/></svg> ${t('common.add')}`;
-    btn.className = 'btn-action btn-ghost-green';
-    const cancelBtn = document.getElementById('btn-cancel-edit'); if (cancelBtn) cancelBtn.remove();
+    gererSousCategoriesForm(false);
+    const btn = document.getElementById('btn-submit-vocab');
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 8px;"><path d="M5 12h14"/><path d="M12 5v14"/></svg> ${t('common.add')}`;
+        btn.className = 'btn-action btn-ghost-green';
+    }
+    if (closeModal) {
+        const modal = document.getElementById('modal-item');
+        if (modal) modal.style.display = 'none';
+    }
 }
 
-async function supprimerVocabulaire(id) { if (!confirm(t('library.confirm_delete_item'))) return; try { await apiFetch(`/vocabulaire/${id}`, { method: 'DELETE' }); chargerVocabulaireApi(); } catch (e) { } }
+async function supprimerVocabulaire(id) {
+    if (!confirm(t('library.confirm_delete_item'))) return;
+    try {
+        const scrollBefore = window.scrollY;
+        await apiFetch(`/vocabulaire/${id}`, { method: 'DELETE' });
+        await chargerVocabulaireApi(true);
+        window.scrollTo({ top: scrollBefore, behavior: 'instant' });
+    } catch (e) { }
+}
 
 
 // ==========================================
@@ -4849,50 +5004,13 @@ async function lancerImmersif(item) {
 
 async function genererSmartShuffle(categorie, sousCategoriesArray) {
     const toutVocab = await lireLocal('vocabulaire');
-    // 1. Filtrage strict par Catégorie (ex: un Morceau Favori n'apparaît jamais dans Licks Favoris)
-    const isMorceauCat = typeof estCategorieMorceaux === 'function' ? estCategorieMorceaux(categorie) : (categorie === 'Morceaux');
-    let itemsFiltres = toutVocab.filter(item => {
-        if (isMorceauCat) {
-            return typeof estCategorieMorceaux === 'function' ? estCategorieMorceaux(item.type_item) : (item.type_item === 'Morceaux');
-        }
-        return item.type_item === categorie;
-    });
-
-    // 2. Logique ensembliste sur les sous-catégories et Favoris
-    if (sousCategoriesArray && sousCategoriesArray.length > 0) {
-        const isFavSc = (sc) => (typeof estLabelFavoris === 'function' ? estLabelFavoris(sc) : sc === 'Favoris');
-        const veutFavoris = sousCategoriesArray.some(sc => isFavSc(sc));
-        const autresSousCats = sousCategoriesArray.filter(sc => !isFavSc(sc));
-
-        const matchSousCat = (item) => {
-            const scItem = Array.isArray(item.sous_categories) ? item.sous_categories : (item.sous_categorie ? [item.sous_categorie] : []);
-            return scItem.some(sc => autresSousCats.includes(sc));
-        };
-
-        if (veutFavoris && autresSousCats.length === 0) {
-            // Intersection : Catégorie ∩ Favoris
-            itemsFiltres = itemsFiltres.filter(item => estItemFavori(item));
-        } else if (!veutFavoris && autresSousCats.length > 0) {
-            // Intersection : Catégorie ∩ (Union des sous-catégories cochées)
-            itemsFiltres = itemsFiltres.filter(item => matchSousCat(item));
-        } else if (veutFavoris && autresSousCats.length > 0) {
-            // Intersection : Catégorie ∩ Favoris ∩ (Union des sous-catégories cochées)
-            itemsFiltres = itemsFiltres.filter(item => estItemFavori(item) && matchSousCat(item));
-        }
+    if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.drawImmersiveQueue === 'function') {
+        return window.LibraryDomain.drawImmersiveQueue(toutVocab, {
+            categorie: categorie,
+            sousCategories: sousCategoriesArray
+        });
     }
-
-    itemsFiltres.sort((a, b) => {
-        const isFavA = estItemFavori(a) ? 1 : 0;
-        const isFavB = estItemFavori(b) ? 1 : 0;
-        if (isFavA !== isFavB) return isFavB - isFavA;
-        const pratA = parseInt(a.stats ? a.stats.nb_pratiques : (a.nb_pratiques || 0), 10);
-        const pratB = parseInt(b.stats ? b.stats.nb_pratiques : (b.nb_pratiques || 0), 10);
-        if (pratA !== pratB) return pratA - pratB;
-        const dateA = a.stats && a.stats.date_derniere_pratique ? new Date(a.stats.date_derniere_pratique).getTime() : 0;
-        const dateB = b.stats && b.stats.date_derniere_pratique ? new Date(b.stats.date_derniere_pratique).getTime() : 0;
-        return dateA - dateB;
-    });
-    return itemsFiltres;
+    return [];
 }
 
 function toggleModePupitre(actif) {
@@ -5194,12 +5312,15 @@ function renderShuffleCard() {
 
         let itemBadges = ""; const sc = (Array.isArray(item.sous_categories) ? item.sous_categories : (item.sous_categorie ? [item.sous_categorie] : [])).filter(s => !estStyleIrealAFiltrer(s));
         if (sc.length > 0) { itemBadges = sc.map(s => `<span class="vocab-meta badge">${s}</span>`).join(' '); }
+        const attrsText = formaterAttributsItemUI(item);
+        const attrsHtml = attrsText ? `<div class="vocab-attributs">${attrsText}</div>` : '';
 
         listHtml += `
             <div id="vocab-card-${item.id}" class="${cardClasses}" style="cursor: pointer; transition: all 0.2s;" onclick="if(!event.target.closest('button')) { currentShuffleIndex = ${idx}; renderShuffleCard(); }">
                 ${imageHtml}
                 <div class="vocab-details">
                     <span class="vocab-title">${item.titre || t('common.untitled')}</span>
+                    ${attrsHtml}
                     <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
                         <span class="vocab-meta badge" style="border-color: var(--accent-blue); color: var(--accent-blue);">${item.type_item}</span>${itemBadges}
                     </div>
@@ -5559,7 +5680,7 @@ function renderSetlistDrawerItems() {
     concertState.morceaux.forEach((m, idx) => {
         const isCurrent = idx === concertState.currentIndex;
         const safeTitre = (m.titre || t('library.untitled')).replace(/"/g, '&quot;');
-        let tona = m.tonalite || (m.ireal_data ? m.ireal_data.tona_origine : '') || '';
+        let tona = (m.attributs && m.attributs.tonalite) || m.tonalite || (m.ireal_data ? m.ireal_data.tona_origine : '') || '';
         if (!estTonaliteValide(tona)) {
             tona = '';
         }
@@ -5629,7 +5750,7 @@ function afficherCarteConcertSansPartition(song) {
     const metaEl = document.getElementById('concert-empty-meta');
     const chordsEl = document.getElementById('concert-empty-chords');
 
-    let tona = song.tonalite || (song.ireal_data ? song.ireal_data.tona_origine : '') || '';
+    let tona = (song.attributs && song.attributs.tonalite) || song.tonalite || (song.ireal_data ? song.ireal_data.tona_origine : '') || '';
     if (!estTonaliteValide(tona)) {
         tona = '';
     }
@@ -5644,12 +5765,18 @@ function afficherCarteConcertSansPartition(song) {
 
     if (titreEl) titreEl.textContent = song.titre || t('library.untitled');
 
-    const metaParts = [];
-    if (song.tempo) metaParts.push(`${song.tempo} BPM`);
+    const metaText = formaterAttributsItemUI({
+        attributs: {
+            compositeur: (song.attributs && song.attributs.compositeur) || song.compositeur || null,
+            style: (song.attributs && song.attributs.style) || song.style || null,
+            tonalite: null,
+            tempo: (song.attributs && song.attributs.tempo) || song.tempo || null
+        }
+    });
 
     if (metaEl) {
-        metaEl.textContent = metaParts.join(' • ');
-        metaEl.style.display = metaParts.length > 0 ? 'block' : 'none';
+        metaEl.textContent = metaText;
+        metaEl.style.display = metaText ? 'block' : 'none';
     }
 
     if (chordsEl) {

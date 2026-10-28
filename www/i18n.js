@@ -8,7 +8,6 @@ const CATEGORIES_DEFAUT_FR = {
     "Patterns": ["Majeur", "Mineur", "Dominante", "Pentatonique", "Diminué", "Autres"],
     "Licks": ["II V I majeur", "II V I mineur", "I VI II V", "Blues", "Autres"],
     "Morceaux": [],
-    "Projets": [],
     "Relevés": [],
     "Technique": ["Gammes majeures", "Gammes mineures", "Gammes dominantes", "Hanon", "Autres"]
 };
@@ -18,7 +17,6 @@ const CATEGORIES_DEFAUT_EN = {
     "Patterns": ["Major", "Minor", "Dominant", "Pentatonic", "Diminished", "Other"],
     "Licks": ["Major II-V-I", "Minor II-V-I", "I-VI-II-V", "Blues", "Other"],
     "Tunes": [],
-    "Projects": [],
     "Transcriptions": [],
     "Technique": ["Major Scales", "Minor Scales", "Dominant Scales", "Hanon", "Other"]
 };
@@ -98,10 +96,23 @@ const I18N_DICT = {
         "library.dictaphone_title": "Dictaphone (Enregistreur)",
         "library.dictaphone_rec_title": "Enregistrement en cours (Dictaphone)",
         "library.notebook_title": "Cahier de musique manuscrit",
-        "library.item_name_label": "Nom de l'élément",
-        "library.item_name_placeholder": "Nom...",
+        "library.item_name_label": "Titre",
+        "library.item_name_placeholder": "Titre...",
         "library.category_label": "Catégorie",
         "library.subcategory_label": "Sous-catégorie",
+        "library.setlists_subcat_label": "Setlists",
+        "library.none_subcat": "Aucune",
+        "library.add_item_btn": "+ Ajouter",
+        "library.modal_add_title": "Ajouter un item",
+        "library.modal_edit_title": "Modifier l'item",
+        "library.attr_composer_label": "Compositeur / Artiste",
+        "library.attr_composer_placeholder": "Ex : Bill Evans",
+        "library.attr_style_label": "Style",
+        "library.attr_style_placeholder": "Ex : Medium Swing, Waltz...",
+        "library.attr_key_label": "Tonalité",
+        "library.attr_key_placeholder": "Ex : F, Cm, Bb...",
+        "library.attr_tempo_label": "Tempo (BPM)",
+        "library.attr_tempo_placeholder": "Ex : 140",
         "library.score_label": "Partition associée",
         "library.choose_files": "Choisir des fichiers",
         "library.choose_file": "Choisir un fichier",
@@ -144,6 +155,7 @@ const I18N_DICT = {
         // Commun
         "common.favorites": "Favoris",
         "common.favorite_title": "Favori",
+        "common.options": "Options",
         "common.edit": "Modifier",
         "common.delete": "Supprimer",
         "common.remove": "Supprimer",
@@ -660,6 +672,19 @@ const I18N_DICT = {
         "library.item_name_placeholder": "Title...",
         "library.category_label": "Category",
         "library.subcategory_label": "Subcategory",
+        "library.setlists_subcat_label": "Setlists",
+        "library.none_subcat": "None",
+        "library.add_item_btn": "+ Add",
+        "library.modal_add_title": "Add to Library",
+        "library.modal_edit_title": "Edit Item",
+        "library.attr_composer_label": "Composer / Artist",
+        "library.attr_composer_placeholder": "e.g. Bill Evans",
+        "library.attr_style_label": "Style",
+        "library.attr_style_placeholder": "e.g. Medium Swing, Waltz...",
+        "library.attr_key_label": "Key",
+        "library.attr_key_placeholder": "e.g. F, Cm, Bb...",
+        "library.attr_tempo_label": "Tempo (BPM)",
+        "library.attr_tempo_placeholder": "e.g. 140",
         "library.score_label": "Add Score",
         "library.choose_files": "Choose files",
         "library.choose_file": "Choose file",
@@ -702,6 +727,7 @@ const I18N_DICT = {
         // Common
         "common.favorites": "Favorites",
         "common.favorite_title": "Favorite",
+        "common.options": "Options",
         "common.edit": "Edit",
         "common.delete": "Delete",
         "common.remove": "Remove",
@@ -1172,6 +1198,9 @@ function t(key, params = {}) {
 
 function getCategoriesDefautPourLangue(lang) {
     const l = lang || getCurrentLang();
+    if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.getDefaultCategories === 'function') {
+        return window.LibraryDomain.getDefaultCategories(l);
+    }
     return JSON.parse(JSON.stringify(l === 'en' ? CATEGORIES_DEFAUT_EN : CATEGORIES_DEFAUT_FR));
 }
 
@@ -1301,28 +1330,34 @@ function appliquerTraductionsDOM() {
     setTitle('#btn-save-routine', 'creation.save_routine_title');
     setTxt('#btn-save-seance', 'creation.save_session_btn');
 
-    // Vue Bibliothèque
+    // Vue Bibliothèque & Modale d'ajout/édition d'Item
     setTxt('#vue-bibliotheque .header-creation h2', 'library.title');
     setTxt('button[onclick="reinitialiserBibliotheque()"]', 'library.reset');
-    const biblioSections = document.querySelectorAll('#vue-bibliotheque .form-section');
-    if (biblioSections[0]) {
-        const h3 = biblioSections[0].querySelector('h3');
-        if (h3) h3.textContent = t('library.add_section');
-    }
+    setTxt('#btn-open-modal-item', 'library.add_item_btn');
     setTitle('#btn-inbox-zip-trigger', 'library.import_sort_title');
     setTxt('#btn-inbox-zip-trigger', 'library.import_sort_btn');
     setTitle('#btn-biblio-dictaphone', 'library.dictaphone_title');
     setTitle('#btn-biblio-cahier', 'library.notebook_title');
 
-    const formVocab = document.getElementById('form-vocabulaire');
-    if (formVocab) {
-        const labels = formVocab.querySelectorAll('label');
-        if (labels[0]) labels[0].textContent = t('library.item_name_label');
-        if (labels[1]) labels[1].textContent = t('library.category_label');
-        if (labels[2]) labels[2].textContent = t('library.subcategory_label');
-        if (labels[3]) labels[3].textContent = t('library.score_label');
-        if (labels[4]) labels[4].textContent = t('library.audio_label');
+    if (typeof editVocabId === 'undefined' || editVocabId === null) {
+        setTxt('#titre-modal-item', 'library.modal_add_title');
+    } else {
+        setTxt('#titre-modal-item', 'library.modal_edit_title');
     }
+    setTxt('#label-vocab-nom', 'library.item_name_label');
+    setTxt('#label-vocab-type', 'library.category_label');
+    setTxt('#label-vocab-sous-type', 'library.subcategory_label');
+    setTxt('#label-vocab-compositeur', 'library.attr_composer_label');
+    setPh('#input-vocab-compositeur', 'library.attr_composer_placeholder');
+    setTxt('#label-vocab-style', 'library.attr_style_label');
+    setPh('#input-vocab-style', 'library.attr_style_placeholder');
+    setTxt('#label-vocab-tonalite', 'library.attr_key_label');
+    setPh('#input-vocab-tonalite', 'library.attr_key_placeholder');
+    setTxt('#label-vocab-tempo', 'library.attr_tempo_label');
+    setPh('#input-vocab-tempo', 'library.attr_tempo_placeholder');
+    setTxt('#label-vocab-score', 'library.score_label');
+    setTxt('#label-vocab-audio', 'library.audio_label');
+
     setPh('#input-vocab-nom', 'library.item_name_placeholder');
     const btnChooseImg = document.querySelector('div[onclick*="input-vocab-image"] > span:first-child');
     if (btnChooseImg) btnChooseImg.textContent = t('library.choose_files');
@@ -1341,6 +1376,7 @@ function appliquerTraductionsDOM() {
     } else {
         setTxt('#btn-submit-vocab', 'common.save');
     }
+    setTxt('#btn-cancel-modal-item', 'common.cancel');
     setTxt('button[onclick="ouvrirGestionnairePlaylists()"]', 'library.setlists_btn');
     setPh('#search-biblio', 'library.search_placeholder');
     setTitle('#btn-filter-fav-biblio', 'library.fav_filter_title');
