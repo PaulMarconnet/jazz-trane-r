@@ -314,6 +314,28 @@ const I18N_DICT = {
 
         // Trieur Express
         "sorter.title": "Trieur Express",
+        "sorter.prep_subtitle": "{count} fichier(s) prêt(s) à être importé(s)",
+        "sorter.target_cat": "Catégorie cible",
+        "sorter.subcats_setlists": "Setlists / Sous-catégories",
+        "sorter.create_setlist_checkbox": "Créer une Setlist pour cet import",
+        "sorter.setlist_name_placeholder": "Nom de la Setlist",
+        "sorter.mode_section_title": "Mode de traitement",
+        "sorter.mode_fast_title": "Mode Rapide",
+        "sorter.mode_fast_desc": "Recommandé pour un premier import ou de nouveaux éléments",
+        "sorter.mode_careful_title": "Mode Prudent",
+        "sorter.mode_careful_desc": "Recommandé pour compléter des éléments existants et éviter de potentiels doublons",
+        "sorter.start_import_btn": "Lancer l'import ({count} fichiers)",
+        "sorter.progress_file_n_of_total": "Fichier {current} sur {total}",
+        "sorter.btn_skip": "Ignorer",
+        "sorter.btn_create": "Créer",
+        "sorter.btn_merge": "Fusionner",
+        "sorter.summary_title": "Import terminé",
+        "sorter.summary_created": "Créés",
+        "sorter.summary_merged": "Enrichis",
+        "sorter.summary_probables": "Doublons probables créés",
+        "sorter.summary_probables_review": "Doublons probables créés (à revoir si souhaité) :",
+        "sorter.summary_close_btn": "Terminer",
+        "sorter.similar_to": "ressemble à",
         "sorter.items_left": "{count} élément(s) restant(s)",
         "sorter.current_file": "Fichier en cours :",
         "sorter.matched_item": "Fichier associé à l'élément existant :",
@@ -322,7 +344,7 @@ const I18N_DICT = {
         "sorter.unlink_btn": "Dissocier et créer un nouvel élément",
         "sorter.item_title_label": "Titre de l'élément",
         "sorter.item_title_placeholder": "Ex: Autumn Leaves",
-        "sorter.skip_btn": "Corbeille",
+        "sorter.skip_btn": "Ignorer",
         "sorter.save_next_btn": "Enregistrer & Suivant",
         "sorter.merge_next_btn": "Fusionner & Suivant",
         "sorter.guide": "Chaque fichier crée un nouvel élément ou enrichit un élément existant sans rien écraser.",
@@ -893,6 +915,28 @@ const I18N_DICT = {
 
         // Quick Sorter (Trieur Express)
         "sorter.title": "Quick Sorter",
+        "sorter.prep_subtitle": "{count} file(s) ready to import",
+        "sorter.target_cat": "Target category",
+        "sorter.subcats_setlists": "Setlists / Subcategories",
+        "sorter.create_setlist_checkbox": "Create a Setlist for this import",
+        "sorter.setlist_name_placeholder": "Setlist name",
+        "sorter.mode_section_title": "Processing mode",
+        "sorter.mode_fast_title": "Fast Mode",
+        "sorter.mode_fast_desc": "Recommended for initial imports or brand new tunes",
+        "sorter.mode_careful_title": "Careful Mode",
+        "sorter.mode_careful_desc": "Recommended when enriching existing tunes and preventing duplicates",
+        "sorter.start_import_btn": "Start import ({count} files)",
+        "sorter.progress_file_n_of_total": "File {current} of {total}",
+        "sorter.btn_skip": "Skip",
+        "sorter.btn_create": "Create",
+        "sorter.btn_merge": "Merge",
+        "sorter.summary_title": "Import complete",
+        "sorter.summary_created": "Created",
+        "sorter.summary_merged": "Enriched",
+        "sorter.summary_probables": "Probable duplicates created",
+        "sorter.summary_probables_review": "Probable duplicates created (review if desired):",
+        "sorter.summary_close_btn": "Done",
+        "sorter.similar_to": "similar to",
         "sorter.items_left": "{count} item(s) left",
         "sorter.current_file": "Current file:",
         "sorter.matched_item": "Matched with existing library item:",
@@ -1487,22 +1531,26 @@ function appliquerTraductionsDOM() {
 
     // Modale Trieur Express
     setTxt('#modal-trieur .trieur-header h3', 'sorter.title');
-    const curFileSpan = document.querySelector('#modal-trieur .trieur-body > div:first-child > span');
-    if (curFileSpan) curFileSpan.textContent = t('sorter.current_file');
+    setTxt('#trieur-prep-lbl-cat', 'sorter.target_cat');
+    setTxt('#trieur-prep-lbl-sous-cat', 'sorter.subcats_setlists');
+    setTxt('#trieur-lbl-creer-setlist', 'sorter.create_setlist_checkbox');
+    setPh('#trieur-input-nom-setlist', 'sorter.setlist_name_placeholder');
+    setTxt('#trieur-prep-lbl-mode', 'sorter.mode_section_title');
+    setTxt('#trieur-opt-mode-rapide strong', 'sorter.mode_fast_title');
+    setTxt('#trieur-opt-mode-rapide span', 'sorter.mode_fast_desc');
+    setTxt('#trieur-opt-mode-prudent strong', 'sorter.mode_careful_title');
+    setTxt('#trieur-opt-mode-prudent span', 'sorter.mode_careful_desc');
     const fusionHead = document.querySelector('#trieur-mode-fusion > div:first-child');
     if (fusionHead) fusionHead.textContent = t('sorter.matched_item');
     setTxt('#trieur-fusion-desc', 'sorter.merge_desc_score');
     setTxt('button[onclick="annulerFusionTrieur()"]', 'sorter.unlink_btn');
     const trieurLabels = document.querySelectorAll('#trieur-mode-creation > label');
     if (trieurLabels[0]) trieurLabels[0].textContent = t('sorter.item_title_label');
-    if (trieurLabels[1]) trieurLabels[1].textContent = t('library.category_label');
-    if (trieurLabels[2]) trieurLabels[2].textContent = t('library.subcategory_label');
     setPh('#trieur-input-titre', 'sorter.item_title_placeholder');
-    setTxt('button[onclick="ignorerFichierTrieur()"]', 'sorter.skip_btn');
-    setTxt('#btn-valider-trieur', 'sorter.save_next_btn');
-    setTxt('#btn-valider-tout', 'sorter.apply_all_btn');
-    setTxt('#trieur-mode-rapide', 'sorter.mode_fast');
-    setTxt('#trieur-mode-prudent', 'sorter.mode_careful');
+    setTxt('#btn-trieur-ignorer', 'sorter.btn_skip');
+    setTxt('#btn-trieur-creer', 'sorter.btn_create');
+    setTxt('#btn-trieur-fusionner', 'sorter.btn_merge');
+    setTxt('#trieur-vue-bilan h3', 'sorter.summary_title');
 
     // Modale Paramètres
     setTxt('#modal-settings h3', 'settings.title');

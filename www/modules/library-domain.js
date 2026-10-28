@@ -420,6 +420,18 @@
         return { type: 'none', item: null, similarity: bestSim };
     }
 
+    function normalizeComposerName(raw) {
+        if (!raw || typeof raw !== 'string') return null;
+        const clean = raw.trim();
+        if (!clean) return null;
+        if (/[&/;,]/.test(clean)) return clean;
+        const words = clean.split(/\s+/).filter(Boolean);
+        if (words.length <= 1) return clean;
+        const prenom = words[words.length - 1];
+        const nom = words.slice(0, words.length - 1).join(' ');
+        return `${prenom} ${nom}`;
+    }
+
     // Décode un lien/fichier/HTML contenant irealb:// (un morceau ou une playlist)
     function parseIRealLink(text) {
         const result = { playlistName: null, tunes: [] };
@@ -437,9 +449,10 @@
                 let titre = parts[0].trim();
                 const m = titre.match(/^(.*), (The|A|An|Le|La|Les)$/i);
                 if (m) titre = m[2] + ' ' + m[1];
+                const rawComp = (parts[1] || '').trim() || null;
                 result.tunes.push({
                     titre,
-                    compositeur: (parts[1] || '').trim() || null,
+                    compositeur: normalizeComposerName(rawComp),
                     style: (parts[2] || '').trim() || null,
                     tonalite: (parts[3] || '').trim() || null,
                     grille: 'irealb://' + chunk
@@ -451,9 +464,11 @@
         return result;
     }
 
-    // Regroupe des noms de fichiers (ZIP ou lot) par morceau : pages numérotées -> un groupe
+    // Regroupe des noms de fichiers (ZIP ou lot) par morceau
+    // Les PDF et fichiers audio ne sont JAMAIS tronqués multipages (chacun reste un groupe distinct avec son nom complet).
+    // Les images ne sont regroupées que si au moins 2 fichiers partagent la même racine candidate.
     function groupImportFiles(names) {
-        const groups = new Map();
+        const cleanFiles = [];
         for (const raw of (names || [])) {
             if (!raw || raw.includes('__MACOSX')) continue;
             const full = String(raw).split('/').pop();
@@ -462,11 +477,36 @@
             const kind = AUDIO_EXTS.includes(ext) ? 'audio' : (SCORE_EXTS.includes(ext) ? 'score' : null);
             if (!kind) continue;
             const noExt = full.substring(0, full.lastIndexOf('.'));
-            const pm = noExt.match(/[-_]\s*(?:page|p)?\s*0*(\d+)$/i);
-            const baseName = pm ? noExt.substring(0, pm.index) : noExt;
-            if (!groups.has(baseName)) groups.set(baseName, { baseName, ext, kind, names: [] });
-            groups.get(baseName).names.push(raw);
+            cleanFiles.push({ raw, full, ext, kind, noExt });
         }
+
+        const imageCandidateCounts = new Map();
+        for (const f of cleanFiles) {
+            if (f.kind === 'score' && f.ext !== 'pdf') {
+                const pm = f.noExt.match(/[-_]\s*(?:page|p)?\s*0*(\d+)$/i);
+                const candBase = pm ? f.noExt.substring(0, pm.index) : f.noExt;
+                imageCandidateCounts.set(candBase, (imageCandidateCounts.get(candBase) || 0) + 1);
+            }
+        }
+
+        const groups = new Map();
+        for (const f of cleanFiles) {
+            let baseName = f.noExt;
+            if (f.kind === 'score' && f.ext !== 'pdf') {
+                const pm = f.noExt.match(/[-_]\s*(?:page|p)?\s*0*(\d+)$/i);
+                if (pm) {
+                    const candBase = f.noExt.substring(0, pm.index);
+                    if ((imageCandidateCounts.get(candBase) || 0) >= 2) {
+                        baseName = candBase;
+                    }
+                }
+            }
+            if (!groups.has(baseName)) {
+                groups.set(baseName, { baseName, ext: f.ext, kind: f.kind, names: [] });
+            }
+            groups.get(baseName).names.push(f.raw);
+        }
+
         const list = Array.from(groups.values());
         list.forEach(g => g.names.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
         return list;
@@ -521,6 +561,28 @@
         }, data);
     }
 
+    function getBatchSummary(operations) {
+        let created = 0;
+        let merged = 0;
+        const probableDuplicates = [];
+        for (const op of (operations || [])) {
+            if (op.kind === 'merge') {
+                merged++;
+            } else if (op.kind === 'create') {
+                created++;
+                if (op.probableMatch) {
+                    probableDuplicates.push({
+                        item: op.item,
+                        candidate: op.candidate,
+                        probableMatch: op.probableMatch,
+                        similarity: op.similarity
+                    });
+                }
+            }
+        }
+        return { created, merged, probableDuplicates };
+    }
+
     // Planifie un lot (pur) : retourne les opérations à appliquer, l'éventuel arrêt (Mode Prudent) et le reste à traiter
     function planBatch(candidates, items, mode) {
         const prudent = mode === 'prudent';
@@ -540,14 +602,21 @@
                 return {
                     operations,
                     pending: list.slice(i),
-                    stop: { reason: m.type === 'probable' ? 'probable' : 'new', candidate: cand, match: m.item }
+                    stop: { reason: m.type === 'probable' ? 'probable' : 'new', candidate: cand, match: m.item },
+                    summary: getBatchSummary(operations)
                 };
             }
             const created = createItemFromImport(cand);
             working.push(created);
-            operations.push({ kind: 'create', item: created, candidate: cand });
+            operations.push({
+                kind: 'create',
+                item: created,
+                candidate: cand,
+                probableMatch: m.type === 'probable' ? m.item : null,
+                similarity: m.type === 'probable' ? m.similarity : 0
+            });
         }
-        return { operations, pending: [], stop: null };
+        return { operations, pending: [], stop: null, summary: getBatchSummary(operations) };
     }
 
     return {
@@ -555,10 +624,12 @@
         canonicalTitle,
         levenshteinSimilarity,
         findMatch,
+        normalizeComposerName,
         parseIRealLink,
         groupImportFiles,
         mergeImport,
         createItemFromImport,
+        getBatchSummary,
         planBatch,
         normalizeItem,
         formatItemAttributes,

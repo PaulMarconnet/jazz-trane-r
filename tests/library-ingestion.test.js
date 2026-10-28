@@ -42,19 +42,39 @@ describe('library-domain - findMatch (2 niveaux)', () => {
     });
 });
 
+describe('library-domain - normalisation du compositeur iReal Pro', () => {
+    it('inverse Nom Prénom en Prénom Nom', () => {
+        const norm = LibraryDomain.normalizeComposerName;
+        expect(norm('Coltrane John')).toBe('John Coltrane');
+        expect(norm('Corea Chick')).toBe('Chick Corea');
+        expect(norm('Van Heusen Jimmy')).toBe('Jimmy Van Heusen');
+        expect(norm('Evans Bill')).toBe('Bill Evans');
+    });
+    it('préserve les auteurs multiples contenant &, / ou virgule', () => {
+        const norm = LibraryDomain.normalizeComposerName;
+        expect(norm('Rodgers Richard & Hart Lorenz')).toBe('Rodgers Richard & Hart Lorenz');
+        expect(norm('Gershwin George / Gershwin Ira')).toBe('Gershwin George / Gershwin Ira');
+        expect(norm('Davis, Miles')).toBe('Davis, Miles');
+        expect(norm('Unknown')).toBe('Unknown');
+        expect(norm(null)).toBeNull();
+    });
+});
+
 describe('library-domain - décodage iReal Pro', () => {
-    it('décode une playlist irealb:// avec nom de playlist et article déplacé', () => {
-        const raw = 'irealb://Autumn Leaves, The=Kosma=Medium Swing=Gm=n=T44{x}===Blue Bossa=Dorham=Bossa Nova=Cm=n=T44{y}===Ma Playlist';
+    it('décode une playlist irealb:// avec nom de playlist, compositeur inversé et article déplacé', () => {
+        const raw = 'irealb://Autumn Leaves, The=Kosma Joseph=Medium Swing=Gm=n=T44{x}===Blue Bossa=Dorham Kenny=Bossa Nova=Cm=n=T44{y}===Ma Playlist';
         const r = LibraryDomain.parseIRealLink(raw);
         expect(r.playlistName).toBe('Ma Playlist');
         expect(r.tunes).toHaveLength(2);
-        expect(r.tunes[0]).toMatchObject({ titre: 'The Autumn Leaves', compositeur: 'Kosma', style: 'Medium Swing', tonalite: 'Gm' });
+        expect(r.tunes[0]).toMatchObject({ titre: 'The Autumn Leaves', compositeur: 'Joseph Kosma', style: 'Medium Swing', tonalite: 'Gm' });
+        expect(r.tunes[1]).toMatchObject({ titre: 'Blue Bossa', compositeur: 'Kenny Dorham', style: 'Bossa Nova', tonalite: 'Cm' });
         expect(r.tunes[0].grille).toContain('irealb://Autumn Leaves, The=Kosma');
     });
     it('décode un lien encodé en URI dans du HTML', () => {
-        const html = '<a href="irealb://Solar%3DDavis%3DMedium%20Swing%3DCm%3Dn%3DT44">x</a>';
+        const html = '<a href="irealb://Solar%3DDavis%20Miles%3DMedium%20Swing%3DCm%3Dn%3DT44">x</a>';
         const r = LibraryDomain.parseIRealLink(html);
         expect(r.tunes[0].titre).toBe('Solar');
+        expect(r.tunes[0].compositeur).toBe('Miles Davis');
         expect(r.playlistName).toBeNull();
     });
     it('retourne une liste vide sans lien', () => {
@@ -63,13 +83,24 @@ describe('library-domain - décodage iReal Pro', () => {
 });
 
 describe('library-domain - regroupement des fichiers importés', () => {
-    it('regroupe les pages numérotées et déduit l\'extension', () => {
-        const groups = LibraryDomain.groupImportFiles(['Solar-1.png', 'Solar-2.png', 'Nardis.pdf', 'Take.mp3', 'notes.txt', '__MACOSX/x.png']);
-        expect(groups.map(g => g.baseName)).toEqual(['Solar', 'Nardis', 'Take']);
+    it('ne regroupe jamais les PDF multipages et préserve les suffixes comme 26-2', () => {
+        const groups = LibraryDomain.groupImportFiles(['26-2.pdf', '9 -20.pdf', 'Giant Steps.pdf']);
+        expect(groups.map(g => g.baseName)).toEqual(['26-2', '9 -20', 'Giant Steps']);
+        expect(groups.every(g => g.names.length === 1)).toBe(true);
+    });
+    it('regroupe les images seulement si au moins deux fichiers partagent la base', () => {
+        const groups = LibraryDomain.groupImportFiles([
+            'Solar-1.png', 'Solar-2.png',
+            'Solo-2.jpg',
+            'Take.mp3',
+            'notes.txt',
+            '__MACOSX/x.png'
+        ]);
+        expect(groups.map(g => g.baseName)).toEqual(['Solar', 'Solo-2', 'Take']);
         expect(groups[0].names).toEqual(['Solar-1.png', 'Solar-2.png']);
+        expect(groups[1].names).toEqual(['Solo-2.jpg']);
         expect(groups[0].ext).toBe('png');
         expect(groups[2].kind).toBe('audio');
-        expect(groups[1].kind).toBe('score');
     });
 });
 
@@ -103,11 +134,17 @@ describe('library-domain - modes de lot', () => {
         { titre: 'Giant Steps', categorie: 'Morceaux' },                    // nouveau
         { titre: 'Autum Leavs', categorie: 'Morceaux' }                     // probable
     ];
-    it('Mode Rapide : fusionne les exacts, crée les nouveaux, crée aussi les probables', () => {
+    it('Mode Rapide : fusionne les exacts, crée les nouveaux, crée aussi les probables et génère un bilan', () => {
         const r = LibraryDomain.planBatch(cands, items, 'rapide');
         expect(r.pending).toEqual([]);
         expect(r.operations.map(o => o.kind)).toEqual(['merge', 'create', 'create']);
         expect(r.operations[0].item.attributs.style).toBe('Swing');
+        expect(r.summary).toBeDefined();
+        expect(r.summary.created).toBe(2);
+        expect(r.summary.merged).toBe(1);
+        expect(r.summary.probableDuplicates).toHaveLength(1);
+        expect(r.summary.probableDuplicates[0].candidate.titre).toBe('Autum Leavs');
+        expect(r.summary.probableDuplicates[0].probableMatch.titre).toBe('Autumn Leaves');
     });
     it('Mode Prudent : fusionne les exacts puis s\'arrête sur le premier nouvel Item', () => {
         const r = LibraryDomain.planBatch(cands, items, 'prudent');

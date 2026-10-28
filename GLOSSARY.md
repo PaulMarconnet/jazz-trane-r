@@ -55,3 +55,21 @@ _Éviter_ : patch, jalon principal, milestone
 **Ticket** :
 Une unité de travail d'une spec, implémentée dans une conversation dédiée et conclue par un commit.
 _Éviter_ : jalon, tâche, étape
+
+## Import
+
+**Trieur Express** :
+L'assistant d'import qui range un lot de fichiers (partitions, audio, grilles iReal Pro) dans la bibliothèque : chaque fichier crée un nouvel item ou enrichit un item existant.
+_Éviter_ : inbox, importeur
+
+**Correspondance Exacte** :
+Deux titres considérés comme identiques malgré les variantes de casse, d'accents, de ponctuation ou d'article (`Bags' Groove` = `Bag's Groove`). Le fichier enrichit alors l'item existant, sans demander.
+_Éviter_ : doublon strict
+
+**Doublon Probable** :
+Un titre très proche, mais pas identique, d'un item existant (faute de frappe). Le Trieur Express propose « Vous vouliez dire … ? » et laisse l'utilisateur décider.
+_Éviter_ : quasi-doublon, match flou
+
+**Mode Rapide / Mode Prudent** :
+Les deux façons de lancer un import. Rapide : tout est traité sans interruption. Prudent : l'import s'arrête sur chaque nouvel item et chaque Doublon Probable pour demander quoi faire. Les Correspondances Exactes sont enrichies automatiquement dans les deux modes.
+_Éviter_ : appliquer à tous, import automatique

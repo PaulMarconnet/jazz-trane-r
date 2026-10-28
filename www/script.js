@@ -4433,7 +4433,13 @@ function renderBiblioChunk(chunkSize = BIBLIO_CHUNK_SIZE) {
         const imageHtml = genererMediaHtml(item);
         const titreItem = item.titre || t('common.untitled');
         const attrsText = formaterAttributsItemUI(item);
-        const attrsHtml = attrsText ? `<div class="vocab-attributs">${attrsText}</div>` : '';
+        const nbPratiques = item.stats ? item.stats.nb_pratiques : (item.nb_pratiques || 0);
+        let fullSubtitle = attrsText;
+        if (nbPratiques > 0) {
+            const pratiqueText = t('library.practiced_count', { count: nbPratiques });
+            fullSubtitle = fullSubtitle ? `${fullSubtitle} · ${pratiqueText}` : pratiqueText;
+        }
+        const attrsHtml = fullSubtitle ? `<div class="vocab-attributs">${fullSubtitle}</div>` : '';
 
         let badgesHtml = "";
         const scNettoyees = (item.sous_categories && Array.isArray(item.sous_categories))
@@ -4444,7 +4450,6 @@ function renderBiblioChunk(chunkSize = BIBLIO_CHUNK_SIZE) {
         }
         const favBtnClass = item.favori ? "btn-action btn-ghost-amber btn-square" : "btn-action btn-ghost-neutral btn-square";
         const favIcon = item.favori ? svgStarFilled : svgStarOutline;
-        const nbPratiques = item.stats ? item.stats.nb_pratiques : (item.nb_pratiques || 0);
 
         const isAudioPlayingItem = (typeof transcribeState !== 'undefined' && Number(transcribeState.currentItemId) === Number(item.id) && transcribeState.isPlaying);
         const audioBtnHtml = item.fichier_audio ? `<button class="btn-action ${isAudioPlayingItem ? 'btn-ghost-blue active' : 'btn-ghost-neutral'} btn-square btn-card-audio" data-item-id="${item.id}" onclick="ouvrirLecteurAudioItem(${item.id}, event)" title="${t('library.listen_audio_title')}">${isAudioPlayingItem ? svgPause : svgAudioPlay}</button>` : '';
@@ -4457,9 +4462,6 @@ function renderBiblioChunk(chunkSize = BIBLIO_CHUNK_SIZE) {
                 ${attrsHtml}
                 <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
                     <span class="vocab-meta badge" style="border-color: var(--accent-blue); color: var(--accent-blue);">${item.type_item}</span>${badgesHtml}
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
-                    <div class="vocab-meta">${t('library.practiced_count', { count: nbPratiques })}</div>
                 </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
@@ -4791,16 +4793,6 @@ async function executerImportIRealPro(htmlContent, defaultName) {
     if (decoded.tunes.length === 0 && !htmlContent.includes('irealb://')) { alert(t('ireal.no_tunes_found')); return; }
 
     const nomPlaylistDetecte = decoded.playlistName || defaultName || t('ireal.default_setlist_name');
-    let playlistName = prompt(t('ireal.prompt_setlist_name'), nomPlaylistDetecte);
-    if (!playlistName) return;
-
-    // S'assurer que la sous-catégorie existe dans Morceaux / Tunes
-    const catMorceaux = typeof getNomCategorieMorceaux === 'function' ? getNomCategorieMorceaux(SOUS_CATEGORIES) : 'Morceaux';
-    if (!SOUS_CATEGORIES[catMorceaux]) SOUS_CATEGORIES[catMorceaux] = [];
-    if (!SOUS_CATEGORIES[catMorceaux].includes(playlistName)) {
-        SOUS_CATEGORIES[catMorceaux].push(playlistName);
-        sauvegarderCategoriesConfig(SOUS_CATEGORIES);
-    }
 
     const irealQueue = decoded.tunes.map(tune => ({
         isIReal: true,
@@ -4810,7 +4802,6 @@ async function executerImportIRealPro(htmlContent, defaultName) {
         style: tune.style || '',
         key: tune.tonalite || '',
         singleUrl: tune.grille,
-        playlistName: playlistName,
         ext: 'ireal',
         entries: []
     }));
@@ -4820,17 +4811,11 @@ async function executerImportIRealPro(htmlContent, defaultName) {
         return;
     }
 
-    // Basculer sur la bibliothèque et lancer le Trieur Express
     if (typeof afficherVue === 'function') afficherVue('bibliotheque');
-    inboxQueue = irealQueue;
-    currentInboxFile = null;
-    currentInboxBase64Array = [];
-    itemFusionCible = null;
-
-    const modalTrieur = document.getElementById('modal-trieur');
-    if (modalTrieur) modalTrieur.style.display = 'flex';
-    initChipsTrieur();
-    await afficherProchainFichierTrieur();
+    ouvrirPreparationTrieur(irealQueue, {
+        isIReal: true,
+        defaultPlaylistName: nomPlaylistDetecte
+    });
 }
 
 async function reinitialiserBibliotheque() {
@@ -8115,9 +8100,20 @@ if (typeof window !== 'undefined') {
 
 
 // ==========================================
-// --- MOTEUR TRIEUR EXPRESS (INBOX ZIP)  ---
+// --- MOTEUR TRIEUR EXPRESS (INBOX & LOTS) ---
 // ==========================================
-let inboxQueue = []; let currentInboxFile = null; let currentInboxMime = null; let currentInboxBase64Array = []; let itemFusionCible = null;
+
+let trieurQueue = [];
+let trieurContext = { isIReal: false, defaultPlaylistName: '', totalInitial: 0, mode: 'rapide' };
+let trieurStats = { created: 0, merged: 0, probableDuplicates: [] };
+let currentInboxFile = null;
+let currentInboxBase64Array = [];
+let currentInboxMime = null;
+let itemFusionCible = null;
+let itemProbableCible = null;
+let trieurCategorieGlobale = 'Morceaux';
+let trieurSousCategoriesGlobales = [];
+let trieurTraitesCount = 0;
 
 async function traiterInboxZip(event) {
     const rawFiles = event.target.files; if (!rawFiles || rawFiles.length === 0) return;
@@ -8127,8 +8123,8 @@ async function traiterInboxZip(event) {
 
     try {
         const files = Array.from(rawFiles);
-        inboxQueue = [];
-        const sources = new Map(); // nom -> entrée compatible entry.async("base64")
+        const queue = [];
+        const sources = new Map();
         const fileToEntry = (file) => ({
             name: file.name,
             async: () => new Promise((resolve, reject) => {
@@ -8154,8 +8150,9 @@ async function traiterInboxZip(event) {
         }
 
         for (const group of LibraryDomain.groupImportFiles(Array.from(sources.keys()))) {
-            inboxQueue.push({
+            queue.push({
                 baseName: group.baseName,
+                titre: group.baseName,
                 ext: group.ext,
                 entries: group.names.map(n => {
                     const src = sources.get(n);
@@ -8164,9 +8161,9 @@ async function traiterInboxZip(event) {
             });
         }
 
-        if (inboxQueue.length === 0) return alert(t('sorter.no_valid_files'));
-        document.getElementById('modal-trieur').style.display = 'flex';
-        initChipsTrieur(); await afficherProchainFichierTrieur();
+        if (queue.length === 0) return alert(t('sorter.no_valid_files'));
+        if (typeof afficherVue === 'function') afficherVue('bibliotheque');
+        ouvrirPreparationTrieur(queue, { isIReal: false });
 
     } catch (err) {
         console.error("Erreur import trieur :", err);
@@ -8178,41 +8175,159 @@ async function traiterInboxZip(event) {
     }
 }
 
-function initChipsTrieur() {
-    const container = document.getElementById('trieur-chips-categorie'); container.innerHTML = "";
-    for (const cat in SOUS_CATEGORIES) { container.innerHTML += `<button type="button" class="chip btn-action btn-ghost-neutral" onclick="selectChipTrieur('categorie', '${cat}')">${cat}</button>`; }
+function ouvrirPreparationTrieur(queue, options = {}) {
+    trieurQueue = [...queue];
+    trieurContext = {
+        isIReal: !!options.isIReal,
+        defaultPlaylistName: options.defaultPlaylistName || '',
+        totalInitial: queue.length,
+        mode: 'rapide'
+    };
+    trieurStats = { created: 0, merged: 0, probableDuplicates: [] };
+    currentInboxFile = null;
+    itemFusionCible = null;
+    itemProbableCible = null;
+
+    const modal = document.getElementById('modal-trieur');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    document.getElementById('trieur-vue-preparation').style.display = 'block';
+    document.getElementById('trieur-vue-cours').style.display = 'none';
+    document.getElementById('trieur-vue-bilan').style.display = 'none';
+
+    document.getElementById('trieur-prep-subtitle').innerText = t('sorter.prep_subtitle', { count: queue.length });
+    document.getElementById('btn-trieur-lancer').innerText = t('sorter.start_import_btn', { count: queue.length });
+
+    initChipsPreparationTrieur();
+
+    const blocIreal = document.getElementById('trieur-prep-bloc-ireal-setlist');
+    if (blocIreal) {
+        if (trieurContext.isIReal) {
+            blocIreal.style.display = 'block';
+            const check = document.getElementById('trieur-checkbox-creer-setlist');
+            if (check) check.checked = true;
+            const input = document.getElementById('trieur-input-nom-setlist');
+            if (input) input.value = trieurContext.defaultPlaylistName;
+        } else {
+            blocIreal.style.display = 'none';
+        }
+    }
+
+    choisirModeTrieur('rapide');
 }
 
-function selectChipTrieur(groupType, value) {
-    const group = document.getElementById(`trieur-chips-${groupType}`); if (!group) return; const chips = group.querySelectorAll('.chip');
-    if (groupType === 'sous-categorie') {
+function initChipsPreparationTrieur() {
+    const container = document.getElementById('trieur-prep-chips-categorie');
+    if (!container) return;
+    container.innerHTML = "";
+    const defaultMorceaux = getNomCategorieMorceaux(SOUS_CATEGORIES);
+    for (const cat in SOUS_CATEGORIES) {
+        const isActive = (cat === defaultMorceaux);
+        const cls = isActive ? 'btn-ghost-blue active' : 'btn-ghost-neutral';
+        container.innerHTML += `<button type="button" class="chip btn-action ${cls}" onclick="selectChipPreparationTrieur('categorie', '${cat}')">${cat}</button>`;
+    }
+    renderSousCategoriesPreparationTrieur(defaultMorceaux);
+}
+
+function selectChipPreparationTrieur(groupType, value) {
+    const group = document.getElementById(`trieur-prep-chips-${groupType}`);
+    if (!group) return;
+    const chips = group.querySelectorAll('.chip');
+    if (groupType === 'sous-cat') {
         const clickedChip = Array.from(chips).find(c => c.innerText.trim() === value);
         if (clickedChip) {
-            if (clickedChip.classList.contains('active')) { clickedChip.classList.remove('active', 'btn-ghost-blue'); clickedChip.classList.add('btn-ghost-neutral'); }
-            else { clickedChip.classList.add('active', 'btn-ghost-blue'); clickedChip.classList.remove('btn-ghost-neutral'); }
+            if (clickedChip.classList.contains('active')) {
+                clickedChip.classList.remove('active', 'btn-ghost-blue');
+                clickedChip.classList.add('btn-ghost-neutral');
+            } else {
+                clickedChip.classList.add('active', 'btn-ghost-blue');
+                clickedChip.classList.remove('btn-ghost-neutral');
+            }
         }
     } else {
         chips.forEach(c => { c.classList.remove('active', 'btn-ghost-blue'); c.classList.add('btn-ghost-neutral'); });
         const activeChip = Array.from(chips).find(c => c.innerText.trim() === value);
         if (activeChip) { activeChip.classList.add('active', 'btn-ghost-blue'); activeChip.classList.remove('btn-ghost-neutral'); }
-        if (groupType === 'categorie') renderSousCategoriesTrieur(value);
+        if (groupType === 'categorie') renderSousCategoriesPreparationTrieur(value);
     }
 }
 
-function renderSousCategoriesTrieur(categorie) {
-    const label = document.getElementById('trieur-label-sous-categorie'); const chipGroup = document.getElementById('trieur-chips-sous-categorie');
+function renderSousCategoriesPreparationTrieur(categorie) {
+    const bloc = document.getElementById('trieur-prep-bloc-sous-cat');
+    const chipGroup = document.getElementById('trieur-prep-chips-sous-cat');
+    if (!bloc || !chipGroup) return;
     const listePuces = getSousCategoriesPour(categorie);
     if (listePuces.length > 0) {
-        label.style.display = 'block'; chipGroup.innerHTML = '';
-        listePuces.forEach((sc) => { const safeVal = sc.replace(/'/g, "\\'"); chipGroup.innerHTML += `<button type="button" class="chip btn-action btn-ghost-neutral" onclick="selectChipTrieur('sous-categorie', '${safeVal}')">${sc}</button>`; });
-    } else { label.style.display = 'none'; chipGroup.innerHTML = ''; }
+        bloc.style.display = 'block';
+        chipGroup.innerHTML = '';
+        listePuces.forEach((sc) => {
+            const safeVal = sc.replace(/'/g, "\\'");
+            chipGroup.innerHTML += `<button type="button" class="chip btn-action btn-ghost-neutral" onclick="selectChipPreparationTrieur('sous-cat', '${safeVal}')">${sc}</button>`;
+        });
+    } else {
+        bloc.style.display = 'none';
+        chipGroup.innerHTML = '';
+    }
 }
 
-function ignorerFichierTrieur() { afficherProchainFichierTrieur(); }
-function fermerTrieur() { document.getElementById('modal-trieur').style.display = 'none'; inboxQueue = []; currentInboxFile = null; currentInboxBase64Array = []; chargerVocabulaireApi(); }
+function choisirModeTrieur(mode) {
+    trieurContext.mode = (mode === 'prudent') ? 'prudent' : 'rapide';
+    const btnRapide = document.getElementById('trieur-opt-mode-rapide');
+    const btnPrudent = document.getElementById('trieur-opt-mode-prudent');
+    if (btnRapide && btnPrudent) {
+        if (trieurContext.mode === 'rapide') {
+            btnRapide.classList.add('active', 'btn-ghost-blue');
+            btnRapide.classList.remove('btn-ghost-neutral');
+            btnPrudent.classList.remove('active', 'btn-ghost-blue');
+            btnPrudent.classList.add('btn-ghost-neutral');
+        } else {
+            btnPrudent.classList.add('active', 'btn-ghost-blue');
+            btnPrudent.classList.remove('btn-ghost-neutral');
+            btnRapide.classList.remove('active', 'btn-ghost-blue');
+            btnRapide.classList.add('btn-ghost-neutral');
+        }
+    }
+}
 
-const SVG_TRIEUR_SAVE = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-const SVG_TRIEUR_MERGE = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/></svg>`;
+async function demarrerImportTrieur() {
+    const catActive = document.querySelector('#trieur-prep-chips-categorie .chip.active');
+    trieurCategorieGlobale = catActive ? catActive.innerText.trim() : getNomCategorieMorceaux(SOUS_CATEGORIES);
+    trieurSousCategoriesGlobales = Array.from(document.querySelectorAll('#trieur-prep-chips-sous-cat .chip.active')).map(c => c.innerText.trim());
+
+    if (trieurContext.isIReal) {
+        const checkCreer = document.getElementById('trieur-checkbox-creer-setlist');
+        const inputNom = document.getElementById('trieur-input-nom-setlist');
+        if (checkCreer && checkCreer.checked && inputNom && inputNom.value.trim()) {
+            const nomSetlist = inputNom.value.trim();
+            const catMorceaux = getNomCategorieMorceaux(SOUS_CATEGORIES);
+            if (!SOUS_CATEGORIES[catMorceaux]) SOUS_CATEGORIES[catMorceaux] = [];
+            if (!SOUS_CATEGORIES[catMorceaux].includes(nomSetlist)) {
+                SOUS_CATEGORIES[catMorceaux].push(nomSetlist);
+                sauvegarderCategoriesConfig(SOUS_CATEGORIES);
+            }
+            if (!trieurSousCategoriesGlobales.includes(nomSetlist)) {
+                trieurSousCategoriesGlobales.push(nomSetlist);
+            }
+        }
+    }
+
+    document.getElementById('trieur-vue-preparation').style.display = 'none';
+    document.getElementById('trieur-vue-cours').style.display = 'block';
+    document.getElementById('trieur-vue-bilan').style.display = 'none';
+
+    trieurTraitesCount = 0;
+    majProgressionTrieur(0, trieurContext.totalInitial);
+    await traiterSuiteTrieur();
+}
+
+function majProgressionTrieur(actuel, total) {
+    const pct = total > 0 ? Math.min(100, Math.round((actuel / total) * 100)) : 100;
+    const txt = document.getElementById('trieur-progression-texte');
+    if (txt) txt.innerText = t('sorter.progress_file_n_of_total', { current: actuel, total: total });
+    const bar = document.getElementById('trieur-progress-bar');
+    if (bar) bar.style.width = pct + '%';
+}
 
 function mimeInboxPourExt(ext) {
     if (['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'].includes(ext)) return `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
@@ -8226,55 +8341,6 @@ async function lireEntreesInbox(fileInfo) {
     return { b64Array, mime: mimeInboxPourExt(fileInfo.ext) };
 }
 
-// Titre / catégorie devinés (préfixe `Categorie_Titre` pour les fichiers) — partagé par l'aperçu et le traitement par lot
-function devinerTitreEtCategorieInbox(fileInfo, categorieForcee) {
-    if (fileInfo.isIReal) {
-        return {
-            titre: fileInfo.titre || fileInfo.baseName || "Sans_Titre",
-            categorie: categorieForcee || getNomCategorieMorceaux(SOUS_CATEGORIES)
-        };
-    }
-    let categorie = categorieForcee || getCategorieParDefaut();
-    let titre = fileInfo.baseName;
-    if (titre.includes('_')) {
-        const parts = titre.split('_');
-        const catPotentielle = parts[0].trim();
-        if (SOUS_CATEGORIES[catPotentielle] || estCategorieMorceaux(catPotentielle)) {
-            if (!categorieForcee) categorie = catPotentielle;
-            titre = parts.slice(1).join(' ').trim();
-        }
-    }
-    titre = titre.replace(/_/g, ' ').trim();
-    return { titre: titre || "Sans_Titre", categorie };
-}
-
-function trouverCorrespondanceTrieur(titre, categorie) {
-    return LibraryDomain.findMatch(vocabulaireCache, titre, { categorie });
-}
-
-// Pastille « Nouvel Item » / « Enrichit un Item existant » + bannière « Vous vouliez dire… ? »
-function majIndicateursTrieur(itemCible, doublonProbable) {
-    const badge = document.getElementById('trieur-action-badge');
-    if (badge) {
-        badge.className = 'badge ' + (itemCible ? 'badge-blue' : 'badge-green');
-        badge.innerText = itemCible ? t('sorter.badge_enrich') : t('sorter.badge_new');
-    }
-    const banner = document.getElementById('trieur-probable-banner');
-    if (banner) {
-        if (doublonProbable && !itemCible) {
-            banner.style.display = 'block';
-            banner.innerText = t('sorter.did_you_mean', { title: doublonProbable.titre });
-            banner.onclick = () => activerModeFusion(doublonProbable);
-        } else {
-            banner.style.display = 'none';
-            banner.onclick = null;
-        }
-    }
-    const btn = document.getElementById('btn-valider-trieur');
-    if (btn) btn.innerHTML = `${itemCible ? SVG_TRIEUR_MERGE : SVG_TRIEUR_SAVE} ${t(itemCible ? 'sorter.merge_next_btn' : 'sorter.save_next_btn')}`;
-}
-
-// Point d'entrée unique d'application d'un fichier importé : fusion non destructive ou création d'un Item
 async function appliquerFichierInbox(fileInfo, b64Array, mime, titre, categorie, sousCategories, itemCible) {
     const ext = fileInfo.ext;
     const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'].includes(ext);
@@ -8308,88 +8374,142 @@ async function appliquerFichierInbox(fileInfo, b64Array, mime, titre, categorie,
         const saved = await apiFetch(`/vocabulaire/${itemCible.id}`, { method: 'PUT', body: JSON.stringify(merged) });
         const idx = vocabulaireCache.findIndex(v => v.id === itemCible.id);
         if (idx !== -1 && saved && saved.id === itemCible.id) vocabulaireCache[idx] = saved;
+        return saved || merged;
     } else {
         const created = LibraryDomain.createItemFromImport(importData);
         const saved = await apiFetch(`/vocabulaire`, { method: 'POST', body: JSON.stringify(created) });
         vocabulaireCache.push(saved);
+        return saved || created;
     }
 }
 
-async function afficherProchainFichierTrieur() {
-    if (inboxQueue.length === 0) { fermerTrieur(); return; }
+async function traiterSuiteTrieur() {
+    while (trieurQueue.length > 0) {
+        if (trieurContext.mode === 'rapide') {
+            const nextFile = trieurQueue.shift();
+            trieurTraitesCount++;
+            majProgressionTrieur(trieurTraitesCount, trieurContext.totalInitial);
 
-    document.getElementById('trieur-compteur').innerText = t('sorter.items_left', { count: inboxQueue.length });
-    currentInboxFile = inboxQueue.shift();
+            const match = LibraryDomain.findMatch(vocabulaireCache, nextFile.titre, { categorie: trieurCategorieGlobale });
+            const { b64Array, mime } = await lireEntreesInbox(nextFile);
 
-    const loaded = await lireEntreesInbox(currentInboxFile);
-    currentInboxBase64Array = loaded.b64Array;
-    currentInboxMime = loaded.mime;
+            if (match.type === 'exact') {
+                await appliquerFichierInbox(nextFile, b64Array, mime, nextFile.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, match.item);
+                trieurStats.merged++;
+            } else {
+                const created = await appliquerFichierInbox(nextFile, b64Array, mime, nextFile.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, null);
+                trieurStats.created++;
+                if (match.type === 'probable') {
+                    trieurStats.probableDuplicates.push({ item: created, match: match.item, candidateTitre: nextFile.titre });
+                }
+            }
+            await new Promise(r => setTimeout(r, 12));
+        } else {
+            // Mode Prudent
+            const nextFile = trieurQueue[0];
+            const match = LibraryDomain.findMatch(vocabulaireCache, nextFile.titre, { categorie: trieurCategorieGlobale });
 
-    itemFusionCible = null;
-    document.getElementById('trieur-autocomplete-list').style.display = 'none';
-    document.getElementById('trieur-mode-fusion').style.display = 'none';
-    document.getElementById('trieur-mode-creation').style.display = 'block';
+            if (match.type === 'exact') {
+                trieurQueue.shift();
+                trieurTraitesCount++;
+                majProgressionTrieur(trieurTraitesCount, trieurContext.totalInitial);
+                const { b64Array, mime } = await lireEntreesInbox(nextFile);
+                await appliquerFichierInbox(nextFile, b64Array, mime, nextFile.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, match.item);
+                trieurStats.merged++;
+                continue;
+            }
 
-    const guide = document.getElementById('trieur-guide');
-    if (guide) guide.innerText = t('sorter.guide');
+            // Arrêt nécessaire (nouvel item ou doublon probable)
+            currentInboxFile = trieurQueue.shift();
+            const loaded = await lireEntreesInbox(currentInboxFile);
+            currentInboxBase64Array = loaded.b64Array;
+            currentInboxMime = loaded.mime;
+            majProgressionTrieur(trieurTraitesCount + 1, trieurContext.totalInitial);
 
-    const { titre, categorie } = devinerTitreEtCategorieInbox(currentInboxFile, null);
-    selectChipTrieur('categorie', categorie);
-    if (currentInboxFile.isIReal && currentInboxFile.playlistName) {
-        selectChipTrieur('sous-categorie', currentInboxFile.playlistName);
+            const fileNameDisp = currentInboxFile.isIReal
+                ? `iReal Pro : ${currentInboxFile.titre}`
+                : `${currentInboxFile.baseName}.${currentInboxFile.ext}`;
+            document.getElementById('trieur-nom-fichier-courant').innerText = fileNameDisp;
+            document.getElementById('trieur-input-titre').value = currentInboxFile.titre;
+
+            itemFusionCible = null;
+            itemProbableCible = (match.type === 'probable') ? match.item : null;
+
+            document.getElementById('trieur-autocomplete-list').style.display = 'none';
+            document.getElementById('trieur-mode-fusion').style.display = 'none';
+            document.getElementById('btn-trieur-fusionner').style.display = 'none';
+            document.getElementById('btn-trieur-creer').style.display = 'inline-flex';
+
+            const badge = document.getElementById('trieur-action-badge');
+            if (badge) {
+                badge.className = 'badge badge-green';
+                badge.innerText = t('sorter.badge_new');
+            }
+
+            const banner = document.getElementById('trieur-probable-banner');
+            if (banner) {
+                if (match.type === 'probable') {
+                    banner.style.display = 'block';
+                    banner.innerText = t('sorter.did_you_mean', { title: match.item.titre });
+                    banner.onclick = () => activerModeFusion(match.item);
+                } else {
+                    banner.style.display = 'none';
+                    banner.onclick = null;
+                }
+            }
+            return;
+        }
     }
 
-    if (currentInboxFile.isIReal) {
-        const keyInfo = currentInboxFile.key ? ` [${currentInboxFile.key}]` : '';
-        const styleInfo = currentInboxFile.style ? ` - ${currentInboxFile.style}` : '';
-        document.getElementById('trieur-nom-fichier-courant').innerText = `iReal Pro : ${titre}${keyInfo}${styleInfo}`;
-    } else {
-        const pagesInfo = currentInboxBase64Array.length > 1 ? ` (${currentInboxBase64Array.length} pages)` : "";
-        document.getElementById('trieur-nom-fichier-courant').innerText = currentInboxFile.baseName + '.' + currentInboxFile.ext + pagesInfo;
-    }
-
-    const match = trouverCorrespondanceTrieur(titre, categorie);
-    if (match.type === 'exact') {
-        activerModeFusion(match.item);
-    } else {
-        document.getElementById('trieur-input-titre').value = titre;
-        majIndicateursTrieur(null, match.type === 'probable' ? match.item : null);
-    }
+    afficherBilanTrieur();
 }
 
 function activerModeFusion(itemExistant) {
     itemFusionCible = itemExistant;
-    document.getElementById('trieur-mode-creation').style.display = 'none';
     document.getElementById('trieur-mode-fusion').style.display = 'block';
     document.getElementById('trieur-fusion-titre').innerText = itemExistant.titre;
+    document.getElementById('trieur-fusion-desc').innerText = (currentInboxFile && currentInboxFile.isIReal)
+        ? t('sorter.merge_desc_ireal')
+        : t('sorter.merge_desc_score');
 
-    const descEl = document.getElementById('trieur-fusion-desc');
-    if (descEl) {
-        descEl.innerText = (currentInboxFile && currentInboxFile.isIReal) ? t('sorter.merge_desc_ireal') : t('sorter.merge_desc_score');
+    const banner = document.getElementById('trieur-probable-banner');
+    if (banner) banner.style.display = 'none';
+
+    document.getElementById('btn-trieur-fusionner').style.display = 'inline-flex';
+    const badge = document.getElementById('trieur-action-badge');
+    if (badge) {
+        badge.className = 'badge badge-blue';
+        badge.innerText = t('sorter.badge_enrich');
     }
-    majIndicateursTrieur(itemExistant, null);
 }
 
 function annulerFusionTrieur() {
-    const isIReal = currentInboxFile && currentInboxFile.isIReal;
-    const titreBase = isIReal ? currentInboxFile.titre : (itemFusionCible ? itemFusionCible.titre : "");
-    const catBase = isIReal ? getNomCategorieMorceaux(SOUS_CATEGORIES) : (itemFusionCible ? itemFusionCible.type_item : getCategorieParDefaut());
     itemFusionCible = null;
     document.getElementById('trieur-mode-fusion').style.display = 'none';
-    document.getElementById('trieur-mode-creation').style.display = 'block';
-    document.getElementById('trieur-input-titre').value = titreBase;
-    selectChipTrieur('categorie', catBase);
-    if (isIReal && currentInboxFile.playlistName) {
-        selectChipTrieur('sous-categorie', currentInboxFile.playlistName);
+    document.getElementById('btn-trieur-fusionner').style.display = 'none';
+    document.getElementById('trieur-input-titre').value = (currentInboxFile ? currentInboxFile.titre : '');
+
+    const badge = document.getElementById('trieur-action-badge');
+    if (badge) {
+        badge.className = 'badge badge-green';
+        badge.innerText = t('sorter.badge_new');
     }
-    majIndicateursTrieur(null, null);
+
+    if (itemProbableCible) {
+        const banner = document.getElementById('trieur-probable-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.innerText = t('sorter.did_you_mean', { title: itemProbableCible.titre });
+        }
+    }
 }
 
 function filtrerAutocompleteTrieur(val) {
-    const list = document.getElementById('trieur-autocomplete-list'); const query = LibraryDomain.canonicalTitle(val);
+    const list = document.getElementById('trieur-autocomplete-list');
+    if (!list) return;
+    const query = LibraryDomain.canonicalTitle(val);
     if (query.length < 2) { list.style.display = 'none'; return; }
-    const catActive = document.querySelector('#trieur-chips-categorie .chip.active'); const categorie = catActive ? catActive.innerText.trim() : getCategorieParDefaut();
-    const matches = vocabulaireCache.filter(v => v.type_item === categorie && LibraryDomain.canonicalTitle(v.titre).includes(query)).slice(0, 5);
+    const matches = vocabulaireCache.filter(v => v.type_item === trieurCategorieGlobale && LibraryDomain.canonicalTitle(v.titre).includes(query)).slice(0, 5);
     if (matches.length > 0) {
         list.innerHTML = "";
         matches.forEach(m => {
@@ -8404,99 +8524,89 @@ function filtrerAutocompleteTrieur(val) {
             list.appendChild(btn);
         });
         list.style.display = 'block';
-    } else { list.style.display = 'none'; }
-}
-
-document.addEventListener('click', function (e) { if (e.target.id !== 'trieur-input-titre') { const list = document.getElementById('trieur-autocomplete-list'); if (list) list.style.display = 'none'; } });
-
-async function validerFichierTrieur() {
-    if (!currentInboxFile) return;
-    if (!currentInboxFile.isIReal && currentInboxBase64Array.length === 0) return;
-
-    const catActive = document.querySelector('#trieur-chips-categorie .chip.active');
-    const sousCats = Array.from(document.querySelectorAll('#trieur-chips-sous-categorie .chip.active')).map(c => c.innerText.trim());
-    const titre = itemFusionCible
-        ? itemFusionCible.titre
-        : (document.getElementById('trieur-input-titre').value.trim() || currentInboxFile.titre || "Sans_Titre");
-    const categorie = itemFusionCible
-        ? itemFusionCible.type_item
-        : (catActive ? catActive.innerText.trim() : devinerTitreEtCategorieInbox(currentInboxFile, null).categorie);
-
-    await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, titre, categorie, sousCats, itemFusionCible);
-    afficherProchainFichierTrieur();
-}
-
-async function validerToutTrieur() {
-    if (!confirm(t('sorter.confirm_apply_all'))) return;
-
-    const modeSelect = document.getElementById('trieur-mode-lot');
-    const mode = modeSelect && modeSelect.value === 'prudent' ? 'prudent' : 'rapide';
-
-    const btnTout = document.getElementById('btn-valider-tout');
-    const btnValider = document.getElementById('btn-valider-trieur');
-    const compteur = document.getElementById('trieur-compteur');
-    const originalHtml = btnTout.innerHTML;
-
-    // Capturer la catégorie et les sous-catégories cochées par l'utilisateur avant le traitement par lot
-    const catActive = document.querySelector('#trieur-chips-categorie .chip.active');
-    const categorieChoisie = catActive ? catActive.innerText.trim() : null;
-    const sousCategoriesChoisies = Array.from(document.querySelectorAll('#trieur-chips-sous-categorie .chip.active')).map(c => c.innerText.trim());
-
-    btnTout.disabled = true;
-    btnValider.disabled = true;
-
-    const totalFichiers = inboxQueue.length + (currentInboxFile ? 1 : 0);
-    let traites = 0;
-    let arretPrudent = false;
-
-    try {
-        // 1. Fichier actuellement à l'écran : déjà revu par l'utilisateur, appliqué tel qu'affiché
-        if (currentInboxFile) {
-            btnTout.innerHTML = t('sorter.processing_progress', { current: 1, total: totalFichiers });
-            const titreSaisi = itemFusionCible ? itemFusionCible.titre : (document.getElementById('trieur-input-titre').value.trim() || currentInboxFile.titre || "Sans_Titre");
-            const categorieSaisie = itemFusionCible ? itemFusionCible.type_item : (categorieChoisie || devinerTitreEtCategorieInbox(currentInboxFile, null).categorie);
-            await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, titreSaisi, categorieSaisie, sousCategoriesChoisies, itemFusionCible);
-            traites++;
-            await new Promise(resolve => setTimeout(resolve, 30)); // Libère l'Event Loop
-        }
-
-        // 2. File d'attente : décision par le module selon le mode (Rapide / Prudent)
-        while (inboxQueue.length > 0) {
-            const nextFile = inboxQueue.shift();
-            btnTout.innerHTML = t('sorter.processing_progress', { current: traites + 1, total: totalFichiers });
-            await new Promise(resolve => setTimeout(resolve, 30));
-
-            const { titre, categorie } = devinerTitreEtCategorieInbox(nextFile, categorieChoisie);
-            const plan = LibraryDomain.planBatch([{ titre, categorie }], vocabulaireCache, mode);
-            if (plan.stop) {
-                inboxQueue.unshift(nextFile);
-                arretPrudent = true;
-                break;
-            }
-
-            const op = plan.operations[0];
-            const { b64Array, mime } = await lireEntreesInbox(nextFile);
-            await appliquerFichierInbox(nextFile, b64Array, mime, titre, categorie, sousCategoriesChoisies, op.kind === 'merge' ? op.previous : null);
-            traites++;
-            compteur.innerText = t('sorter.items_left', { count: inboxQueue.length });
-        }
-
-        btnTout.disabled = false; btnTout.innerHTML = originalHtml; btnValider.disabled = false;
-        if (arretPrudent) {
-            await afficherProchainFichierTrieur();
-            return;
-        }
-        btnTout.innerHTML = t('sorter.done_btn');
-        setTimeout(() => {
-            btnTout.innerHTML = originalHtml;
-            fermerTrieur();
-            chargerVocabulaireApi(); // Rafraîchir la bibliothèque finale
-        }, 1000);
-    } catch (error) {
-        console.error("Erreur d'import massif:", error);
-        alert(t('sorter.import_error'));
-        btnTout.disabled = false; btnTout.innerHTML = originalHtml; btnValider.disabled = false;
+    } else {
+        list.style.display = 'none';
     }
+}
+
+document.addEventListener('click', function (e) {
+    if (e.target && e.target.id !== 'trieur-input-titre') {
+        const list = document.getElementById('trieur-autocomplete-list');
+        if (list) list.style.display = 'none';
+    }
+});
+
+async function ignorerFichierTrieur() {
+    if (!currentInboxFile) return;
+    trieurTraitesCount++;
+    currentInboxFile = null;
+    itemFusionCible = null;
+    itemProbableCible = null;
+    await traiterSuiteTrieur();
+}
+
+async function validerCreationTrieur() {
+    if (!currentInboxFile) return;
+    const titreFinal = document.getElementById('trieur-input-titre').value.trim() || currentInboxFile.titre || "Sans_Titre";
+    await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, titreFinal, trieurCategorieGlobale, trieurSousCategoriesGlobales, null);
+    trieurStats.created++;
+    trieurTraitesCount++;
+    currentInboxFile = null;
+    itemFusionCible = null;
+    itemProbableCible = null;
+    await traiterSuiteTrieur();
+}
+
+async function validerFusionTrieur() {
+    if (!currentInboxFile || !itemFusionCible) return;
+    await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, itemFusionCible.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, itemFusionCible);
+    trieurStats.merged++;
+    trieurTraitesCount++;
+    currentInboxFile = null;
+    itemFusionCible = null;
+    itemProbableCible = null;
+    await traiterSuiteTrieur();
+}
+
+function afficherBilanTrieur() {
+    document.getElementById('trieur-vue-preparation').style.display = 'none';
+    document.getElementById('trieur-vue-cours').style.display = 'none';
+    document.getElementById('trieur-vue-bilan').style.display = 'block';
+
+    document.getElementById('trieur-bilan-crees').innerText = trieurStats.created;
+    document.getElementById('trieur-bilan-enrichis').innerText = trieurStats.merged;
+    document.getElementById('trieur-bilan-probables').innerText = trieurStats.probableDuplicates.length;
+
+    const listContainer = document.getElementById('trieur-bilan-liste-probables-container');
+    const listEl = document.getElementById('trieur-bilan-liste-probables');
+    if (listContainer && listEl) {
+        if (trieurStats.probableDuplicates.length > 0) {
+            listContainer.style.display = 'block';
+            let html = '';
+            trieurStats.probableDuplicates.forEach(dup => {
+                const safeTitre = (dup.candidateTitre || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeMatch = (dup.match ? dup.match.titre : '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                html += `<div style="padding: 4px 0; border-bottom: 1px solid var(--border-color);">
+                    <strong>${safeTitre}</strong> <span style="color:var(--text-muted);">${t('sorter.similar_to')}</span> <em>${safeMatch}</em>
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        } else {
+            listContainer.style.display = 'none';
+            listEl.innerHTML = '';
+        }
+    }
+}
+
+function fermerTrieur() {
+    const modal = document.getElementById('modal-trieur');
+    if (modal) modal.style.display = 'none';
+    trieurQueue = [];
+    currentInboxFile = null;
+    currentInboxBase64Array = [];
+    itemFusionCible = null;
+    itemProbableCible = null;
+    chargerVocabulaireApi();
 }
 
 
@@ -9537,6 +9647,17 @@ if (typeof window !== 'undefined') {
     window.toggleMesuresCahier = toggleMesuresCahier;
     window.initShareTarget = initShareTarget;
     window.executerImportIRealPro = executerImportIRealPro;
+    window.ouvrirPreparationTrieur = ouvrirPreparationTrieur;
+    window.demarrerImportTrieur = demarrerImportTrieur;
+    window.choisirModeTrieur = choisirModeTrieur;
+    window.selectChipPreparationTrieur = selectChipPreparationTrieur;
+    window.ignorerFichierTrieur = ignorerFichierTrieur;
+    window.validerCreationTrieur = validerCreationTrieur;
+    window.validerFusionTrieur = validerFusionTrieur;
+    window.annulerFusionTrieur = annulerFusionTrieur;
+    window.filtrerAutocompleteTrieur = filtrerAutocompleteTrieur;
+    window.fermerTrieur = fermerTrieur;
+    window.traiterInboxZip = traiterInboxZip;
 }
 
 // FIN DU FICHIER
