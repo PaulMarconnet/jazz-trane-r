@@ -361,8 +361,205 @@
         return sortImmersiveQueue(filtered);
     }
 
+    // ==========================================
+    // --- INGESTION & APPARIEMENT À 2 NIVEAUX ---
+    // ==========================================
+
+    const AUDIO_EXTS = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'];
+    const SCORE_EXTS = ['png', 'jpg', 'jpeg', 'pdf'];
+
+    // Niveau 1 : forme canonique jazz (casse, accents, ponctuation, articles de fin, St./Saint)
+    function canonicalTitle(title) {
+        let s = String(title === undefined || title === null ? '' : title).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        s = s.replace(/[\u2018\u2019\u02bc`´]/g, "'").trim();
+        const art = s.match(/^(.*?),\s*(the|an|a|le|la|les|l')\s*$/);
+        if (art) s = art[2] + (art[2] === "l'" ? '' : ' ') + art[1];
+        s = s.replace(/['"“”«»]/g, '').replace(/[^a-z0-9\s]/g, ' ');
+        return s.split(/\s+/).filter(Boolean).map(w => (w === 'st' ? 'saint' : w)).join(' ');
+    }
+
+    // Niveau 2 : similarité de Levenshtein normalisée (0..1)
+    function levenshteinSimilarity(a, b) {
+        const s = String(a), t = String(b);
+        if (s === t) return 1;
+        const max = Math.max(s.length, t.length);
+        if (max === 0) return 1;
+        let prev = Array.from({ length: t.length + 1 }, (_, i) => i);
+        for (let i = 1; i <= s.length; i++) {
+            const cur = [i];
+            for (let j = 1; j <= t.length; j++) {
+                cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (s[i - 1] === t[j - 1] ? 0 : 1));
+            }
+            prev = cur;
+        }
+        return 1 - prev[t.length] / max;
+    }
+
+    const PROBABLE_THRESHOLD = 0.8;
+
+    function sameCategory(itemType, categorie) {
+        if (!categorie) return true;
+        if (isTunesCategory(categorie)) return isTunesCategory(itemType);
+        return itemType === categorie;
+    }
+
+    function findMatch(items, title, options) {
+        const categorie = options && options.categorie;
+        const canon = canonicalTitle(title);
+        if (!canon || !Array.isArray(items)) return { type: 'none', item: null, similarity: 0 };
+        let best = null, bestSim = 0;
+        for (const item of items) {
+            if (!item || !sameCategory(item.type_item, categorie)) continue;
+            const c = canonicalTitle(item.titre !== undefined ? item.titre : item.nom);
+            if (!c) continue;
+            if (c === canon) return { type: 'exact', item, similarity: 1 };
+            const sim = levenshteinSimilarity(canon, c);
+            if (sim > bestSim) { bestSim = sim; best = item; }
+        }
+        if (best && bestSim >= PROBABLE_THRESHOLD) return { type: 'probable', item: best, similarity: bestSim };
+        return { type: 'none', item: null, similarity: bestSim };
+    }
+
+    // Décode un lien/fichier/HTML contenant irealb:// (un morceau ou une playlist)
+    function parseIRealLink(text) {
+        const result = { playlistName: null, tunes: [] };
+        const src = String(text || '');
+        const idx = src.indexOf('irealb://');
+        if (idx === -1) return result;
+        let data = src.slice(idx + 'irealb://'.length).split(/["<>\r\n]/)[0].trim();
+        try { data = decodeURIComponent(data); } catch (e) { /* déjà décodé */ }
+        const chunks = data.split('===');
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i].trim();
+            if (!chunk) continue;
+            const parts = chunk.split('=');
+            if (parts.length >= 5) {
+                let titre = parts[0].trim();
+                const m = titre.match(/^(.*), (The|A|An|Le|La|Les)$/i);
+                if (m) titre = m[2] + ' ' + m[1];
+                result.tunes.push({
+                    titre,
+                    compositeur: (parts[1] || '').trim() || null,
+                    style: (parts[2] || '').trim() || null,
+                    tonalite: (parts[3] || '').trim() || null,
+                    grille: 'irealb://' + chunk
+                });
+            } else if (i === chunks.length - 1 && i > 0 && !chunk.includes('=')) {
+                result.playlistName = chunk;
+            }
+        }
+        return result;
+    }
+
+    // Regroupe des noms de fichiers (ZIP ou lot) par morceau : pages numérotées -> un groupe
+    function groupImportFiles(names) {
+        const groups = new Map();
+        for (const raw of (names || [])) {
+            if (!raw || raw.includes('__MACOSX')) continue;
+            const full = String(raw).split('/').pop();
+            if (!full || full.startsWith('.') || !full.includes('.')) continue;
+            const ext = full.split('.').pop().toLowerCase();
+            const kind = AUDIO_EXTS.includes(ext) ? 'audio' : (SCORE_EXTS.includes(ext) ? 'score' : null);
+            if (!kind) continue;
+            const noExt = full.substring(0, full.lastIndexOf('.'));
+            const pm = noExt.match(/[-_]\s*(?:page|p)?\s*0*(\d+)$/i);
+            const baseName = pm ? noExt.substring(0, pm.index) : noExt;
+            if (!groups.has(baseName)) groups.set(baseName, { baseName, ext, kind, names: [] });
+            groups.get(baseName).names.push(raw);
+        }
+        const list = Array.from(groups.values());
+        list.forEach(g => g.names.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
+        return list;
+    }
+
+    // Fusion par enrichissement : ne remplace jamais une valeur déjà renseignée
+    function mergeImport(existingItem, imp) {
+        const base = normalizeItem(existingItem);
+        const data = (imp && typeof imp === 'object') ? imp : {};
+        const attr = base.attributs;
+        const incoming = {
+            compositeur: cleanNullableString(data.compositeur),
+            style: cleanNullableString(data.style),
+            tonalite: cleanNullableString(data.tonalite),
+            tempo: cleanNullableTempo(data.tempo)
+        };
+        const grille = cleanNullableString(data.grille);
+        const sc = base.sous_categories.slice();
+        for (const s of (Array.isArray(data.sous_categories) ? data.sous_categories : [])) {
+            const t = cleanNullableString(s);
+            if (t && !isFavoritesLabel(t) && !isIrealStyle(t) && !sc.includes(t)) sc.push(t);
+        }
+        const images = base.fichier_image.slice();
+        for (const f of normalizeFichierImage(data.fichier_image)) {
+            if (!images.includes(f)) images.push(f);
+        }
+        return normalizeItem({
+            ...base,
+            sous_categories: sc,
+            attributs: {
+                compositeur: attr.compositeur || incoming.compositeur,
+                style: attr.style || incoming.style,
+                tonalite: attr.tonalite || incoming.tonalite,
+                tempo: attr.tempo !== null ? attr.tempo : incoming.tempo
+            },
+            ireal_data: {
+                grille: base.ireal_data.grille || grille,
+                tona_origine: base.ireal_data.tona_origine || incoming.tonalite
+            },
+            fichier_image: images,
+            fichier_audio: base.fichier_audio || cleanNullableString(data.fichier_audio)
+        });
+    }
+
+    function createItemFromImport(imp) {
+        const data = (imp && typeof imp === 'object') ? imp : {};
+        return mergeImport({
+            titre: data.titre,
+            type_item: data.categorie || data.type_item || 'Morceaux',
+            sous_categories: [],
+            stats: { nb_pratiques: 0, date_derniere_pratique: null }
+        }, data);
+    }
+
+    // Planifie un lot (pur) : retourne les opérations à appliquer, l'éventuel arrêt (Mode Prudent) et le reste à traiter
+    function planBatch(candidates, items, mode) {
+        const prudent = mode === 'prudent';
+        const working = (Array.isArray(items) ? items : []).slice();
+        const operations = [];
+        const list = Array.isArray(candidates) ? candidates : [];
+        for (let i = 0; i < list.length; i++) {
+            const cand = list[i];
+            const m = findMatch(working, cand.titre, { categorie: cand.categorie || cand.type_item });
+            if (m.type === 'exact') {
+                const merged = mergeImport(m.item, cand);
+                working[working.indexOf(m.item)] = merged;
+                operations.push({ kind: 'merge', item: merged, previous: m.item, candidate: cand });
+                continue;
+            }
+            if (prudent) {
+                return {
+                    operations,
+                    pending: list.slice(i),
+                    stop: { reason: m.type === 'probable' ? 'probable' : 'new', candidate: cand, match: m.item }
+                };
+            }
+            const created = createItemFromImport(cand);
+            working.push(created);
+            operations.push({ kind: 'create', item: created, candidate: cand });
+        }
+        return { operations, pending: [], stop: null };
+    }
+
     return {
         name: 'library-domain',
+        canonicalTitle,
+        levenshteinSimilarity,
+        findMatch,
+        parseIRealLink,
+        groupImportFiles,
+        mergeImport,
+        createItemFromImport,
+        planBatch,
         normalizeItem,
         formatItemAttributes,
         applyItemUpdate,

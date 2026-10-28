@@ -1030,10 +1030,15 @@
             </div>
 
             <div class="trieur-body" style="flex-direction: column;">
+                <!-- Bandeau de guidage -->
+                <div id="trieur-guide"
+                    style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; text-align: center;"></div>
+
                 <!-- Bannière d'information du fichier -->
                 <div
                     style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); padding: 12px; border-radius: 6px; margin-bottom: 24px; text-align: center;">
                     <span class="cadre-section-title" style="display: block;">Fichier en cours :</span>
+                    <span id="trieur-action-badge" class="badge badge-green" style="margin-top: 6px;"></span>
                     <div id="trieur-nom-fichier-courant"
                         style="color: var(--accent-blue); font-weight: 600; margin-top: 4px; word-break: break-all;">
                         nom_du_fichier.pdf</div>
@@ -1058,6 +1063,10 @@
                                 Dissocier et créer un nouvel élément
                             </button>
                         </div>
+
+                        <!-- Bannière doublon probable -->
+                        <button type="button" id="trieur-probable-banner" class="btn-action btn-ghost-blue"
+                            style="display: none; width: 100%; margin-bottom: 16px; font-size: 13px;"></button>
 
                         <!-- BLOC CRÉATION CLASSIQUE -->
                         <div id="trieur-mode-creation">
@@ -1103,6 +1112,13 @@
                                 Enregistrer & Suivant
                             </button>
                             
+                            <!-- CHOIX DU MODE DE LOT -->
+                            <select id="trieur-mode-lot" style="width: 100%; font-size: 13px;"
+                                title="Mode de traitement par lot">
+                                <option value="rapide" id="trieur-mode-rapide">Mode Rapide : tout automatique</option>
+                                <option value="prudent" id="trieur-mode-prudent">Mode Prudent : s'arrêter sur les nouveaux et doublons probables</option>
+                            </select>
+
                             <!-- BOUTON D'IMPORTATION AUTOMATIQUE -->
                             <button id="btn-valider-tout" class="btn-action btn-ghost-neutral" 
                                 style="width: 100%; height: 40px; font-size: 14px; margin-top: -4px;" 

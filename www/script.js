@@ -4787,70 +4787,33 @@ async function importerBackupIRealPro(event) {
 }
 
 async function executerImportIRealPro(htmlContent, defaultName) {
-    const parser = new DOMParser(); const doc = parser.parseFromString(htmlContent, 'text/html');
-    const link = doc.querySelector('a[href^="irealb://"]'); let dataString = "";
+    const decoded = LibraryDomain.parseIRealLink(htmlContent);
+    if (decoded.tunes.length === 0 && !htmlContent.includes('irealb://')) { alert(t('ireal.no_tunes_found')); return; }
 
-    if (link) {
-        dataString = decodeURIComponent(link.getAttribute('href')).replace('irealb://', '');
-    } else if (htmlContent.includes('irealb://')) {
-        const match = htmlContent.match(/irealb:\/\/(.*)/);
-        if (match) dataString = decodeURIComponent(match[1]);
-    }
-
-    if (!dataString) { alert(t('ireal.no_tunes_found')); return; }
-
-    const morceaux = dataString.split('===');
-    let nomPlaylistDetecte = defaultName || t('ireal.default_setlist_name');
-    // Dans le format playlist d'iReal Pro, le tout dernier élément après === est le nom de la playlist
-    if (morceaux.length > 1) {
-        const dernierMorceau = morceaux[morceaux.length - 1].trim();
-        if (dernierMorceau && !dernierMorceau.includes('=')) {
-            nomPlaylistDetecte = dernierMorceau;
-        }
-    }
-
+    const nomPlaylistDetecte = decoded.playlistName || defaultName || t('ireal.default_setlist_name');
     let playlistName = prompt(t('ireal.prompt_setlist_name'), nomPlaylistDetecte);
     if (!playlistName) return;
 
     // S'assurer que la sous-catégorie existe dans Morceaux / Tunes
     const catMorceaux = typeof getNomCategorieMorceaux === 'function' ? getNomCategorieMorceaux(SOUS_CATEGORIES) : 'Morceaux';
-    if (playlistName) {
-        if (!SOUS_CATEGORIES[catMorceaux]) SOUS_CATEGORIES[catMorceaux] = [];
-        if (!SOUS_CATEGORIES[catMorceaux].includes(playlistName)) {
-            SOUS_CATEGORIES[catMorceaux].push(playlistName);
-            sauvegarderCategoriesConfig(SOUS_CATEGORIES);
-        }
+    if (!SOUS_CATEGORIES[catMorceaux]) SOUS_CATEGORIES[catMorceaux] = [];
+    if (!SOUS_CATEGORIES[catMorceaux].includes(playlistName)) {
+        SOUS_CATEGORIES[catMorceaux].push(playlistName);
+        sauvegarderCategoriesConfig(SOUS_CATEGORIES);
     }
 
-    const irealQueue = [];
-    for (const morceau of morceaux) {
-        if (!morceau.trim()) continue;
-        const parts = morceau.split('=');
-
-        if (parts.length >= 5) {
-            let titre = parts[0].trim();
-            const matchArticle = titre.match(/^(.*), (The|A|An|Le|La|Les)$/i);
-            if (matchArticle) { titre = matchArticle[2] + " " + matchArticle[1]; }
-
-            const compositeur = (parts[1] || "").trim();
-            const style = (parts[2] || "").trim();
-            const key = (parts[3] || "").trim();
-            const singleUrl = `irealb://${morceau}`;
-
-            irealQueue.push({
-                isIReal: true,
-                baseName: titre,
-                titre: titre,
-                compositeur: compositeur,
-                style: style,
-                key: key,
-                singleUrl: singleUrl,
-                playlistName: playlistName,
-                ext: 'ireal',
-                entries: []
-            });
-        }
-    }
+    const irealQueue = decoded.tunes.map(tune => ({
+        isIReal: true,
+        baseName: tune.titre,
+        titre: tune.titre,
+        compositeur: tune.compositeur || '',
+        style: tune.style || '',
+        key: tune.tonalite || '',
+        singleUrl: tune.grille,
+        playlistName: playlistName,
+        ext: 'ireal',
+        entries: []
+    }));
 
     if (irealQueue.length === 0) {
         alert(t('ireal.no_valid_tunes'));
@@ -8165,7 +8128,16 @@ async function traiterInboxZip(event) {
     try {
         const files = Array.from(rawFiles);
         inboxQueue = [];
-        let groupedFiles = {};
+        const sources = new Map(); // nom -> entrée compatible entry.async("base64")
+        const fileToEntry = (file) => ({
+            name: file.name,
+            async: () => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            })
+        });
 
         for (const file of files) {
             const fileNameLower = (file.name || '').toLowerCase();
@@ -8173,49 +8145,23 @@ async function traiterInboxZip(event) {
             if (fileNameLower.endsWith('.zip') || isZipMime) {
                 const zip = await JSZip.loadAsync(file);
                 zip.forEach((relativePath, zipEntry) => {
-                    if (zipEntry.dir || relativePath.includes('__MACOSX') || relativePath.startsWith('.')) return;
-                    const ext = relativePath.split('.').pop().toLowerCase();
-                    if (['png', 'jpg', 'jpeg', 'pdf', 'mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac'].includes(ext)) {
-                        const fullName = zipEntry.name.split('/').pop();
-                        const nameNoExt = fullName.substring(0, fullName.lastIndexOf('.'));
-                        let baseName = nameNoExt;
-                        const match = nameNoExt.match(/[-_]\s*(?:page|p)?\s*0*(\d+)$/i);
-                        if (match) baseName = nameNoExt.substring(0, match.index);
-
-                        if (!groupedFiles[baseName]) groupedFiles[baseName] = { ext: ext, files: [] };
-                        groupedFiles[baseName].files.push(zipEntry);
-                    }
+                    if (zipEntry.dir) return;
+                    sources.set(zipEntry.name, zipEntry);
                 });
             } else {
-                const ext = file.name.split('.').pop().toLowerCase();
-                if (['png', 'jpg', 'jpeg', 'pdf', 'mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac'].includes(ext)) {
-                    const fullName = file.name;
-                    const nameNoExt = fullName.substring(0, fullName.lastIndexOf('.'));
-                    let baseName = nameNoExt;
-                    const match = nameNoExt.match(/[-_]\s*(?:page|p)?\s*0*(\d+)$/i);
-                    if (match) baseName = nameNoExt.substring(0, match.index);
-
-                    if (!groupedFiles[baseName]) groupedFiles[baseName] = { ext: ext, files: [] };
-                    // Duck typing d'une entrée JSZip compatible avec entry.async("base64")
-                    groupedFiles[baseName].files.push({
-                        name: file.name,
-                        async: () => new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                                const res = reader.result;
-                                resolve(res.split(',')[1]);
-                            };
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        })
-                    });
-                }
+                sources.set(file.name, fileToEntry(file));
             }
         }
 
-        for (const [baseName, data] of Object.entries(groupedFiles)) {
-            data.files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-            inboxQueue.push({ baseName: baseName, ext: data.ext, entries: data.files });
+        for (const group of LibraryDomain.groupImportFiles(Array.from(sources.keys()))) {
+            inboxQueue.push({
+                baseName: group.baseName,
+                ext: group.ext,
+                entries: group.names.map(n => {
+                    const src = sources.get(n);
+                    return src.name === n ? src : { name: n, async: (...a) => src.async(...a) };
+                })
+            });
         }
 
         if (inboxQueue.length === 0) return alert(t('sorter.no_valid_files'));
@@ -8265,83 +8211,149 @@ function renderSousCategoriesTrieur(categorie) {
 function ignorerFichierTrieur() { afficherProchainFichierTrieur(); }
 function fermerTrieur() { document.getElementById('modal-trieur').style.display = 'none'; inboxQueue = []; currentInboxFile = null; currentInboxBase64Array = []; chargerVocabulaireApi(); }
 
+const SVG_TRIEUR_SAVE = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+const SVG_TRIEUR_MERGE = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/></svg>`;
+
+function mimeInboxPourExt(ext) {
+    if (['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'].includes(ext)) return `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
+    return ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+}
+
+async function lireEntreesInbox(fileInfo) {
+    if (fileInfo.isIReal) return { b64Array: [], mime: 'application/x-ireal' };
+    const b64Array = [];
+    for (const entry of (fileInfo.entries || [])) b64Array.push(await entry.async("base64"));
+    return { b64Array, mime: mimeInboxPourExt(fileInfo.ext) };
+}
+
+// Titre / catégorie devinés (préfixe `Categorie_Titre` pour les fichiers) — partagé par l'aperçu et le traitement par lot
+function devinerTitreEtCategorieInbox(fileInfo, categorieForcee) {
+    if (fileInfo.isIReal) {
+        return {
+            titre: fileInfo.titre || fileInfo.baseName || "Sans_Titre",
+            categorie: categorieForcee || getNomCategorieMorceaux(SOUS_CATEGORIES)
+        };
+    }
+    let categorie = categorieForcee || getCategorieParDefaut();
+    let titre = fileInfo.baseName;
+    if (titre.includes('_')) {
+        const parts = titre.split('_');
+        const catPotentielle = parts[0].trim();
+        if (SOUS_CATEGORIES[catPotentielle] || estCategorieMorceaux(catPotentielle)) {
+            if (!categorieForcee) categorie = catPotentielle;
+            titre = parts.slice(1).join(' ').trim();
+        }
+    }
+    titre = titre.replace(/_/g, ' ').trim();
+    return { titre: titre || "Sans_Titre", categorie };
+}
+
+function trouverCorrespondanceTrieur(titre, categorie) {
+    return LibraryDomain.findMatch(vocabulaireCache, titre, { categorie });
+}
+
+// Pastille « Nouvel Item » / « Enrichit un Item existant » + bannière « Vous vouliez dire… ? »
+function majIndicateursTrieur(itemCible, doublonProbable) {
+    const badge = document.getElementById('trieur-action-badge');
+    if (badge) {
+        badge.className = 'badge ' + (itemCible ? 'badge-blue' : 'badge-green');
+        badge.innerText = itemCible ? t('sorter.badge_enrich') : t('sorter.badge_new');
+    }
+    const banner = document.getElementById('trieur-probable-banner');
+    if (banner) {
+        if (doublonProbable && !itemCible) {
+            banner.style.display = 'block';
+            banner.innerText = t('sorter.did_you_mean', { title: doublonProbable.titre });
+            banner.onclick = () => activerModeFusion(doublonProbable);
+        } else {
+            banner.style.display = 'none';
+            banner.onclick = null;
+        }
+    }
+    const btn = document.getElementById('btn-valider-trieur');
+    if (btn) btn.innerHTML = `${itemCible ? SVG_TRIEUR_MERGE : SVG_TRIEUR_SAVE} ${t(itemCible ? 'sorter.merge_next_btn' : 'sorter.save_next_btn')}`;
+}
+
+// Point d'entrée unique d'application d'un fichier importé : fusion non destructive ou création d'un Item
+async function appliquerFichierInbox(fileInfo, b64Array, mime, titre, categorie, sousCategories, itemCible) {
+    const ext = fileInfo.ext;
+    const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'].includes(ext);
+    const savedFileNames = [];
+    if (!fileInfo.isIReal) {
+        const cleanName = titre.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+        for (let i = 0; i < b64Array.length; i++) {
+            const suffix = b64Array.length > 1 ? `_${i + 1}` : '';
+            const fileNameToSave = `file_${Date.now()}_${cleanName}${suffix}.${ext}`;
+            await sauvegarderFichierLocal(fileNameToSave, `data:${mime};base64,${b64Array[i]}`);
+            savedFileNames.push(fileNameToSave);
+        }
+    }
+
+    const sousCats = Array.isArray(sousCategories) ? sousCategories.slice() : [];
+    if (fileInfo.playlistName && !sousCats.includes(fileInfo.playlistName)) sousCats.push(fileInfo.playlistName);
+
+    const importData = {
+        titre, categorie,
+        sous_categories: sousCats,
+        compositeur: fileInfo.compositeur || null,
+        style: fileInfo.style || null,
+        tonalite: fileInfo.key || null,
+        grille: fileInfo.singleUrl || null,
+        fichier_image: isAudio ? [] : savedFileNames,
+        fichier_audio: isAudio ? savedFileNames[0] : null
+    };
+
+    if (itemCible) {
+        const merged = LibraryDomain.mergeImport(itemCible, importData);
+        const saved = await apiFetch(`/vocabulaire/${itemCible.id}`, { method: 'PUT', body: JSON.stringify(merged) });
+        const idx = vocabulaireCache.findIndex(v => v.id === itemCible.id);
+        if (idx !== -1 && saved && saved.id === itemCible.id) vocabulaireCache[idx] = saved;
+    } else {
+        const created = LibraryDomain.createItemFromImport(importData);
+        const saved = await apiFetch(`/vocabulaire`, { method: 'POST', body: JSON.stringify(created) });
+        vocabulaireCache.push(saved);
+    }
+}
+
 async function afficherProchainFichierTrieur() {
     if (inboxQueue.length === 0) { fermerTrieur(); return; }
 
     document.getElementById('trieur-compteur').innerText = t('sorter.items_left', { count: inboxQueue.length });
     currentInboxFile = inboxQueue.shift();
 
-    const nomSansExt = currentInboxFile.baseName;
-    const ext = currentInboxFile.ext;
-
-    if (currentInboxFile.isIReal) {
-        currentInboxMime = 'application/x-ireal';
-        currentInboxBase64Array = [];
-    } else {
-        currentInboxMime = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac'].includes(ext)
-            ? `audio/${ext === 'mp3' ? 'mpeg' : ext}`
-            : (ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`);
-
-        currentInboxBase64Array = [];
-        if (Array.isArray(currentInboxFile.entries)) {
-            for (let entry of currentInboxFile.entries) {
-                currentInboxBase64Array.push(await entry.async("base64"));
-            }
-        }
-    }
+    const loaded = await lireEntreesInbox(currentInboxFile);
+    currentInboxBase64Array = loaded.b64Array;
+    currentInboxMime = loaded.mime;
 
     itemFusionCible = null;
     document.getElementById('trieur-autocomplete-list').style.display = 'none';
     document.getElementById('trieur-mode-fusion').style.display = 'none';
     document.getElementById('trieur-mode-creation').style.display = 'block';
 
-    const defaultMorceauxCat = getNomCategorieMorceaux(SOUS_CATEGORIES);
+    const guide = document.getElementById('trieur-guide');
+    if (guide) guide.innerText = t('sorter.guide');
+
+    const { titre, categorie } = devinerTitreEtCategorieInbox(currentInboxFile, null);
+    selectChipTrieur('categorie', categorie);
+    if (currentInboxFile.isIReal && currentInboxFile.playlistName) {
+        selectChipTrieur('sous-categorie', currentInboxFile.playlistName);
+    }
 
     if (currentInboxFile.isIReal) {
-        const titreDevine = currentInboxFile.titre;
         const keyInfo = currentInboxFile.key ? ` [${currentInboxFile.key}]` : '';
         const styleInfo = currentInboxFile.style ? ` - ${currentInboxFile.style}` : '';
-        document.getElementById('trieur-nom-fichier-courant').innerText = `iReal Pro : ${titreDevine}${keyInfo}${styleInfo}`;
-
-        selectChipTrieur('categorie', defaultMorceauxCat);
-        if (currentInboxFile.playlistName) {
-            selectChipTrieur('sous-categorie', currentInboxFile.playlistName);
-        }
-
-        const normaliserTitre = (t) => t ? t.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-        const titreNorm = normaliserTitre(titreDevine);
-        const matchParfait = vocabulaireCache.find(v => estCategorieMorceaux(v.type_item) && (
-            normaliserTitre(v.titre) === titreNorm ||
-            (v.titre || "").toLowerCase() === titreDevine.toLowerCase()
-        ));
-
-        if (matchParfait) {
-            activerModeFusion(matchParfait);
-        } else {
-            document.getElementById('trieur-input-titre').value = titreDevine;
-            document.getElementById('btn-valider-trieur').innerHTML = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg> ${t('sorter.save_next_btn')}`;
-        }
+        document.getElementById('trieur-nom-fichier-courant').innerText = `iReal Pro : ${titre}${keyInfo}${styleInfo}`;
     } else {
-        let categorieDevinee = getCategorieParDefaut(); let titreDevine = nomSansExt;
-        if (nomSansExt.includes('_')) {
-            const parts = nomSansExt.split('_');
-            const catPotentielle = parts[0].trim();
-            if (SOUS_CATEGORIES[catPotentielle] || estCategorieMorceaux(catPotentielle)) {
-                categorieDevinee = catPotentielle; titreDevine = parts.slice(1).join(' ').trim();
-            }
-        }
-
-        titreDevine = titreDevine.replace(/_/g, ' ');
-
-        const matchParfait = vocabulaireCache.find(v => (v.titre || "").toLowerCase() === titreDevine.toLowerCase() && v.type_item === categorieDevinee);
-        if (matchParfait) activerModeFusion(matchParfait);
-        else {
-            document.getElementById('trieur-input-titre').value = titreDevine; selectChipTrieur('categorie', categorieDevinee);
-            document.getElementById('btn-valider-trieur').innerHTML = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg> ${t('sorter.save_next_btn')}`;
-        }
-
         const pagesInfo = currentInboxBase64Array.length > 1 ? ` (${currentInboxBase64Array.length} pages)` : "";
-        document.getElementById('trieur-nom-fichier-courant').innerText = nomSansExt + '.' + ext + pagesInfo;
+        document.getElementById('trieur-nom-fichier-courant').innerText = currentInboxFile.baseName + '.' + currentInboxFile.ext + pagesInfo;
+    }
+
+    const match = trouverCorrespondanceTrieur(titre, categorie);
+    if (match.type === 'exact') {
+        activerModeFusion(match.item);
+    } else {
+        document.getElementById('trieur-input-titre').value = titre;
+        majIndicateursTrieur(null, match.type === 'probable' ? match.item : null);
     }
 }
 
@@ -8353,21 +8365,15 @@ function activerModeFusion(itemExistant) {
 
     const descEl = document.getElementById('trieur-fusion-desc');
     if (descEl) {
-        if (currentInboxFile && currentInboxFile.isIReal) {
-            descEl.innerText = t('sorter.merge_desc_ireal');
-        } else {
-            descEl.innerText = t('sorter.merge_desc_score');
-        }
+        descEl.innerText = (currentInboxFile && currentInboxFile.isIReal) ? t('sorter.merge_desc_ireal') : t('sorter.merge_desc_score');
     }
-
-    document.getElementById('btn-valider-trieur').innerHTML = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/></svg> ${t('sorter.merge_next_btn')}`;
+    majIndicateursTrieur(itemExistant, null);
 }
 
 function annulerFusionTrieur() {
     const isIReal = currentInboxFile && currentInboxFile.isIReal;
-    const defaultMorceauxCat = getNomCategorieMorceaux(SOUS_CATEGORIES);
     const titreBase = isIReal ? currentInboxFile.titre : (itemFusionCible ? itemFusionCible.titre : "");
-    const catBase = isIReal ? defaultMorceauxCat : (itemFusionCible ? itemFusionCible.type_item : getCategorieParDefaut());
+    const catBase = isIReal ? getNomCategorieMorceaux(SOUS_CATEGORIES) : (itemFusionCible ? itemFusionCible.type_item : getCategorieParDefaut());
     itemFusionCible = null;
     document.getElementById('trieur-mode-fusion').style.display = 'none';
     document.getElementById('trieur-mode-creation').style.display = 'block';
@@ -8376,14 +8382,14 @@ function annulerFusionTrieur() {
     if (isIReal && currentInboxFile.playlistName) {
         selectChipTrieur('sous-categorie', currentInboxFile.playlistName);
     }
-    document.getElementById('btn-valider-trieur').innerHTML = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; margin-right: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg> ${t('sorter.save_next_btn')}`;
+    majIndicateursTrieur(null, null);
 }
 
 function filtrerAutocompleteTrieur(val) {
-    const list = document.getElementById('trieur-autocomplete-list'); const query = val.trim().toLowerCase();
+    const list = document.getElementById('trieur-autocomplete-list'); const query = LibraryDomain.canonicalTitle(val);
     if (query.length < 2) { list.style.display = 'none'; return; }
     const catActive = document.querySelector('#trieur-chips-categorie .chip.active'); const categorie = catActive ? catActive.innerText.trim() : getCategorieParDefaut();
-    const matches = vocabulaireCache.filter(v => v.type_item === categorie && (v.titre || "").toLowerCase().includes(query)).slice(0, 5);
+    const matches = vocabulaireCache.filter(v => v.type_item === categorie && LibraryDomain.canonicalTitle(v.titre).includes(query)).slice(0, 5);
     if (matches.length > 0) {
         list.innerHTML = "";
         matches.forEach(m => {
@@ -8405,103 +8411,26 @@ document.addEventListener('click', function (e) { if (e.target.id !== 'trieur-in
 
 async function validerFichierTrieur() {
     if (!currentInboxFile) return;
+    if (!currentInboxFile.isIReal && currentInboxBase64Array.length === 0) return;
 
-    if (currentInboxFile.isIReal) {
-        const plName = currentInboxFile.playlistName;
-        if (itemFusionCible) {
-            if (!itemFusionCible.sous_categories) itemFusionCible.sous_categories = [];
-            if (plName && !itemFusionCible.sous_categories.includes(plName)) {
-                itemFusionCible.sous_categories.push(plName);
-            }
-            itemFusionCible.ireal_data = itemFusionCible.ireal_data || {};
-            itemFusionCible.ireal_data.grille = currentInboxFile.singleUrl;
-            itemFusionCible.ireal_data.tona_origine = currentInboxFile.key;
-            itemFusionCible.ireal_data.compositeur = currentInboxFile.compositeur;
-            itemFusionCible.ireal_data.style = currentInboxFile.style;
+    const catActive = document.querySelector('#trieur-chips-categorie .chip.active');
+    const sousCats = Array.from(document.querySelectorAll('#trieur-chips-sous-categorie .chip.active')).map(c => c.innerText.trim());
+    const titre = itemFusionCible
+        ? itemFusionCible.titre
+        : (document.getElementById('trieur-input-titre').value.trim() || currentInboxFile.titre || "Sans_Titre");
+    const categorie = itemFusionCible
+        ? itemFusionCible.type_item
+        : (catActive ? catActive.innerText.trim() : devinerTitreEtCategorieInbox(currentInboxFile, null).categorie);
 
-            if (!itemFusionCible.tonalite && currentInboxFile.key) {
-                itemFusionCible.tonalite = currentInboxFile.key;
-            }
-            if (!itemFusionCible.compositeur && currentInboxFile.compositeur) {
-                itemFusionCible.compositeur = currentInboxFile.compositeur;
-            }
-
-            await apiFetch(`/vocabulaire/${itemFusionCible.id}`, { method: 'PUT', body: JSON.stringify(itemFusionCible) });
-        } else {
-            const titreFinal = document.getElementById('trieur-input-titre').value.trim() || currentInboxFile.titre;
-            const catActive = document.querySelector('#trieur-chips-categorie .chip.active');
-            const categorie = catActive ? catActive.innerText.trim() : getNomCategorieMorceaux(SOUS_CATEGORIES);
-            const sousCatArray = Array.from(document.querySelectorAll('#trieur-chips-sous-categorie .chip.active')).map(c => c.innerText.trim());
-            if (plName && !sousCatArray.includes(plName)) {
-                sousCatArray.push(plName);
-            }
-
-            const nouvelItem = {
-                titre: titreFinal,
-                type_item: categorie,
-                sous_categories: sousCatArray,
-                fichier_image: null,
-                fichier_audio: null,
-                spotify_uri: null,
-                youtube_url: null,
-                tonalite: currentInboxFile.key || null,
-                compositeur: currentInboxFile.compositeur || null,
-                ireal_data: {
-                    grille: currentInboxFile.singleUrl,
-                    tona_origine: currentInboxFile.key,
-                    metrique: null,
-                    compositeur: currentInboxFile.compositeur,
-                    style: currentInboxFile.style
-                },
-                stats: { nb_pratiques: 0, date_derniere_pratique: null },
-                favori: false
-            };
-            const createdItem = await apiFetch(`/vocabulaire`, { method: 'POST', body: JSON.stringify(nouvelItem) });
-            vocabulaireCache.push(createdItem);
-        }
-        afficherProchainFichierTrieur();
-        return;
-    }
-
-    if (currentInboxBase64Array.length === 0) return;
-    const ext = currentInboxFile.ext; let savedFileNames = [];
-    const titreBase = itemFusionCible ? itemFusionCible.titre : document.getElementById('trieur-input-titre').value.trim();
-    const cleanName = titreBase.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
-
-    for (let i = 0; i < currentInboxBase64Array.length; i++) {
-        const suffix = currentInboxBase64Array.length > 1 ? `_${i + 1}` : '';
-        const fileNameToSave = `file_${Date.now()}_${cleanName}${suffix}.${ext}`;
-        const fullBase64 = `data:${currentInboxMime};base64,${currentInboxBase64Array[i]}`;
-        await sauvegarderFichierLocal(fileNameToSave, fullBase64); savedFileNames.push(fileNameToSave);
-    }
-
-    const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'].includes(ext);
-    const sousCatArray = Array.from(document.querySelectorAll('#trieur-chips-sous-categorie .chip.active')).map(c => c.innerText.trim());
-    if (itemFusionCible) {
-        if (isAudio) itemFusionCible.fichier_audio = savedFileNames[0];
-        else itemFusionCible.fichier_image = savedFileNames;
-        if (!Array.isArray(itemFusionCible.sous_categories)) itemFusionCible.sous_categories = [];
-        sousCatArray.forEach(sc => {
-            if (sc && !itemFusionCible.sous_categories.includes(sc)) itemFusionCible.sous_categories.push(sc);
-        });
-        await apiFetch(`/vocabulaire/${itemFusionCible.id}`, { method: 'PUT', body: JSON.stringify(itemFusionCible) });
-    } else {
-        const catActive = document.querySelector('#trieur-chips-categorie .chip.active'); const categorie = catActive ? catActive.innerText.trim() : getCategorieParDefaut();
-        const nouvelItem = {
-            titre: titreBase, type_item: categorie, sous_categories: sousCatArray,
-            fichier_image: isAudio ? null : savedFileNames,
-            fichier_audio: isAudio ? savedFileNames[0] : null,
-            spotify_uri: null, youtube_url: null,
-            ireal_data: { grille: null, tona_origine: null, metrique: null }, stats: { nb_pratiques: 0, date_derniere_pratique: null }, favori: false
-        };
-        const createdItem = await apiFetch(`/vocabulaire`, { method: 'POST', body: JSON.stringify(nouvelItem) });
-        vocabulaireCache.push(createdItem);
-    }
+    await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, titre, categorie, sousCats, itemFusionCible);
     afficherProchainFichierTrieur();
 }
 
 async function validerToutTrieur() {
     if (!confirm(t('sorter.confirm_apply_all'))) return;
+
+    const modeSelect = document.getElementById('trieur-mode-lot');
+    const mode = modeSelect && modeSelect.value === 'prudent' ? 'prudent' : 'rapide';
 
     const btnTout = document.getElementById('btn-valider-tout');
     const btnValider = document.getElementById('btn-valider-trieur');
@@ -8513,82 +8442,53 @@ async function validerToutTrieur() {
     const categorieChoisie = catActive ? catActive.innerText.trim() : null;
     const sousCategoriesChoisies = Array.from(document.querySelectorAll('#trieur-chips-sous-categorie .chip.active')).map(c => c.innerText.trim());
 
-    // Désactivation pour empêcher le multi-clic
     btnTout.disabled = true;
     btnValider.disabled = true;
 
     const totalFichiers = inboxQueue.length + (currentInboxFile ? 1 : 0);
     let traites = 0;
+    let arretPrudent = false;
 
     try {
-        // 1. Traitement du fichier actuellement à l'écran
+        // 1. Fichier actuellement à l'écran : déjà revu par l'utilisateur, appliqué tel qu'affiché
         if (currentInboxFile) {
             btnTout.innerHTML = t('sorter.processing_progress', { current: 1, total: totalFichiers });
             const titreSaisi = itemFusionCible ? itemFusionCible.titre : (document.getElementById('trieur-input-titre').value.trim() || currentInboxFile.titre || "Sans_Titre");
-            const categorieSaisie = categorieChoisie || (currentInboxFile.isIReal ? getNomCategorieMorceaux(SOUS_CATEGORIES) : getCategorieParDefaut());
-
-            await processAutoFichier(currentInboxFile, currentInboxBase64Array, currentInboxMime, titreSaisi, categorieSaisie, itemFusionCible, sousCategoriesChoisies);
+            const categorieSaisie = itemFusionCible ? itemFusionCible.type_item : (categorieChoisie || devinerTitreEtCategorieInbox(currentInboxFile, null).categorie);
+            await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, titreSaisi, categorieSaisie, sousCategoriesChoisies, itemFusionCible);
             traites++;
             await new Promise(resolve => setTimeout(resolve, 30)); // Libère l'Event Loop
         }
 
-        // 2. Traitement de toute la file d'attente (inboxQueue)
+        // 2. File d'attente : décision par le module selon le mode (Rapide / Prudent)
         while (inboxQueue.length > 0) {
             const nextFile = inboxQueue.shift();
             btnTout.innerHTML = t('sorter.processing_progress', { current: traites + 1, total: totalFichiers });
             await new Promise(resolve => setTimeout(resolve, 30));
 
-            if (nextFile.isIReal) {
-                const titreDevine = nextFile.titre || nextFile.baseName || "Sans_Titre";
-                const catDevinee = categorieChoisie || getNomCategorieMorceaux(SOUS_CATEGORIES);
-                const normaliserTitre = (t) => t ? t.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-                const titreNorm = normaliserTitre(titreDevine);
-                const match = vocabulaireCache.find(v => (categorieChoisie ? v.type_item === catDevinee : estCategorieMorceaux(v.type_item)) && (
-                    normaliserTitre(v.titre) === titreNorm ||
-                    (v.titre || "").toLowerCase() === titreDevine.toLowerCase()
-                ));
-                await processAutoFichier(nextFile, [], '', titreDevine, catDevinee, match, sousCategoriesChoisies);
-                traites++;
-                compteur.innerText = t('sorter.items_left', { count: inboxQueue.length });
-                continue;
+            const { titre, categorie } = devinerTitreEtCategorieInbox(nextFile, categorieChoisie);
+            const plan = LibraryDomain.planBatch([{ titre, categorie }], vocabulaireCache, mode);
+            if (plan.stop) {
+                inboxQueue.unshift(nextFile);
+                arretPrudent = true;
+                break;
             }
 
-            let b64Array = [];
-            for (let entry of nextFile.entries) {
-                b64Array.push(await entry.async("base64"));
-            }
-            const mime = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'].includes(nextFile.ext)
-                ? `audio/${nextFile.ext === 'mp3' ? 'mpeg' : nextFile.ext}`
-                : (nextFile.ext === 'pdf' ? 'application/pdf' : `image/${nextFile.ext === 'jpg' ? 'jpeg' : nextFile.ext}`);
-
-            let catDevinee = categorieChoisie || getCategorieParDefaut();
-            let titreDevine = nextFile.baseName;
-
-            // Deviner le titre (et la catégorie si préfixée et non forcée)
-            if (nextFile.baseName.includes('_')) {
-                const parts = nextFile.baseName.split('_');
-                const catPotentielle = parts[0].trim();
-                if (SOUS_CATEGORIES[catPotentielle] || estCategorieMorceaux(catPotentielle)) {
-                    if (!categorieChoisie) catDevinee = catPotentielle;
-                    titreDevine = parts.slice(1).join(' ').trim();
-                }
-            }
-            titreDevine = titreDevine.replace(/_/g, ' ');
-            if (!titreDevine) titreDevine = "Sans_Titre";
-
-            const match = vocabulaireCache.find(v => (v.titre || "").toLowerCase() === titreDevine.toLowerCase() && v.type_item === catDevinee);
-
-            btnTout.innerHTML = t('sorter.saving_progress', { current: traites + 1, total: totalFichiers });
-            await new Promise(resolve => setTimeout(resolve, 30));
-
-            await processAutoFichier(nextFile, b64Array, mime, titreDevine, catDevinee, match, sousCategoriesChoisies);
+            const op = plan.operations[0];
+            const { b64Array, mime } = await lireEntreesInbox(nextFile);
+            await appliquerFichierInbox(nextFile, b64Array, mime, titre, categorie, sousCategoriesChoisies, op.kind === 'merge' ? op.previous : null);
             traites++;
             compteur.innerText = t('sorter.items_left', { count: inboxQueue.length });
         }
 
+        btnTout.disabled = false; btnTout.innerHTML = originalHtml; btnValider.disabled = false;
+        if (arretPrudent) {
+            await afficherProchainFichierTrieur();
+            return;
+        }
         btnTout.innerHTML = t('sorter.done_btn');
         setTimeout(() => {
-            btnTout.disabled = false; btnTout.innerHTML = originalHtml; btnValider.disabled = false;
+            btnTout.innerHTML = originalHtml;
             fermerTrieur();
             chargerVocabulaireApi(); // Rafraîchir la bibliothèque finale
         }, 1000);
@@ -8599,97 +8499,6 @@ async function validerToutTrieur() {
     }
 }
 
-async function processAutoFichier(fileInfo, b64Array, mime, titreFinal, categorieFinale, itemCibleExistant, sousCategoriesBatch = []) {
-    const extraSousCats = Array.isArray(sousCategoriesBatch) ? sousCategoriesBatch : [];
-    if (fileInfo.isIReal) {
-        const plName = fileInfo.playlistName;
-        if (itemCibleExistant) {
-            if (!Array.isArray(itemCibleExistant.sous_categories)) itemCibleExistant.sous_categories = [];
-            if (plName && !itemCibleExistant.sous_categories.includes(plName)) {
-                itemCibleExistant.sous_categories.push(plName);
-            }
-            extraSousCats.forEach(sc => {
-                if (sc && !itemCibleExistant.sous_categories.includes(sc)) {
-                    itemCibleExistant.sous_categories.push(sc);
-                }
-            });
-            itemCibleExistant.ireal_data = itemCibleExistant.ireal_data || {};
-            itemCibleExistant.ireal_data.grille = fileInfo.singleUrl;
-            itemCibleExistant.ireal_data.tona_origine = fileInfo.key;
-            itemCibleExistant.ireal_data.compositeur = fileInfo.compositeur;
-            itemCibleExistant.ireal_data.style = fileInfo.style;
-
-            if (!itemCibleExistant.tonalite && fileInfo.key) {
-                itemCibleExistant.tonalite = fileInfo.key;
-            }
-            if (!itemCibleExistant.compositeur && fileInfo.compositeur) {
-                itemCibleExistant.compositeur = fileInfo.compositeur;
-            }
-            await apiFetch(`/vocabulaire/${itemCibleExistant.id}`, { method: 'PUT', body: JSON.stringify(itemCibleExistant) });
-        } else {
-            const sousCats = [];
-            if (plName) sousCats.push(plName);
-            extraSousCats.forEach(sc => {
-                if (sc && !sousCats.includes(sc)) sousCats.push(sc);
-            });
-            const nouvelItem = {
-                titre: titreFinal,
-                type_item: categorieFinale || getNomCategorieMorceaux(SOUS_CATEGORIES),
-                sous_categories: sousCats,
-                fichier_image: null,
-                fichier_audio: null,
-                spotify_uri: null,
-                youtube_url: null,
-                tonalite: fileInfo.key || null,
-                compositeur: fileInfo.compositeur || null,
-                ireal_data: {
-                    grille: fileInfo.singleUrl,
-                    tona_origine: fileInfo.key,
-                    metrique: null,
-                    compositeur: fileInfo.compositeur,
-                    style: fileInfo.style
-                },
-                stats: { nb_pratiques: 0, date_derniere_pratique: null },
-                favori: false
-            };
-            const createdItem = await apiFetch(`/vocabulaire`, { method: 'POST', body: JSON.stringify(nouvelItem) });
-            vocabulaireCache.push(createdItem);
-        }
-        return;
-    }
-
-    const ext = fileInfo.ext; const cleanName = titreFinal.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20); let savedFileNames = [];
-
-    for (let i = 0; i < b64Array.length; i++) {
-        const suffix = b64Array.length > 1 ? `_${i + 1}` : '';
-        const fileNameToSave = `file_${Date.now()}_${cleanName}${suffix}.${ext}`;
-        const fullBase64 = `data:${mime};base64,${b64Array[i]}`;
-        await sauvegarderFichierLocal(fileNameToSave, fullBase64); savedFileNames.push(fileNameToSave);
-    }
-
-    const isAudio = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac'].includes(ext);
-    if (itemCibleExistant) {
-        if (isAudio) itemCibleExistant.fichier_audio = savedFileNames[0];
-        else itemCibleExistant.fichier_image = savedFileNames;
-        if (!Array.isArray(itemCibleExistant.sous_categories)) itemCibleExistant.sous_categories = [];
-        extraSousCats.forEach(sc => {
-            if (sc && !itemCibleExistant.sous_categories.includes(sc)) {
-                itemCibleExistant.sous_categories.push(sc);
-            }
-        });
-        await apiFetch(`/vocabulaire/${itemCibleExistant.id}`, { method: 'PUT', body: JSON.stringify(itemCibleExistant) });
-    } else {
-        const nouvelItem = {
-            titre: titreFinal, type_item: categorieFinale, sous_categories: [...extraSousCats],
-            fichier_image: isAudio ? null : savedFileNames,
-            fichier_audio: isAudio ? savedFileNames[0] : null,
-            spotify_uri: null, youtube_url: null,
-            ireal_data: { grille: null, tona_origine: null, metrique: null }, stats: { nb_pratiques: 0, date_derniere_pratique: null }, favori: false
-        };
-        const createdItem = await apiFetch(`/vocabulaire`, { method: 'POST', body: JSON.stringify(nouvelItem) });
-        vocabulaireCache.push(createdItem);
-    }
-}
 
 // ==========================================
 // --- WAKE LOCK & NOTIFICATIONS ARRIÈRE-PLAN ---

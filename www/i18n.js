@@ -325,6 +325,12 @@ const I18N_DICT = {
         "sorter.skip_btn": "Corbeille",
         "sorter.save_next_btn": "Enregistrer & Suivant",
         "sorter.merge_next_btn": "Fusionner & Suivant",
+        "sorter.guide": "Chaque fichier crée un nouvel élément ou enrichit un élément existant sans rien écraser.",
+        "sorter.badge_new": "Nouvel élément",
+        "sorter.badge_enrich": "Enrichit un élément existant",
+        "sorter.did_you_mean": "Vous vouliez dire « {title} » ?",
+        "sorter.mode_fast": "Mode Rapide : tout automatique",
+        "sorter.mode_careful": "Mode Prudent : s'arrêter sur les nouveaux et doublons probables",
         "sorter.apply_all_btn": "Appliquer à tous et importer automatiquement",
         "sorter.no_valid_files": "Aucun fichier valide (PDF, image ou audio) trouvé.",
         "sorter.corrupted_error": "Fichier(s) illisible(s) ou archive corrompue.",
@@ -898,6 +904,12 @@ const I18N_DICT = {
         "sorter.skip_btn": "Skip",
         "sorter.save_next_btn": "Save & Next",
         "sorter.merge_next_btn": "Merge & Next",
+        "sorter.guide": "Each file creates a new item or enriches an existing one without overwriting anything.",
+        "sorter.badge_new": "New item",
+        "sorter.badge_enrich": "Enriches an existing item",
+        "sorter.did_you_mean": "Did you mean \"{title}\"?",
+        "sorter.mode_fast": "Fast mode: fully automatic",
+        "sorter.mode_careful": "Careful mode: stop on new items and probable duplicates",
         "sorter.apply_all_btn": "Apply to all & auto-import remaining",
         "sorter.no_valid_files": "No valid files (PDF, image, or audio) found.",
         "sorter.corrupted_error": "Unreadable file(s) or corrupted archive.",
@@ -1489,6 +1501,8 @@ function appliquerTraductionsDOM() {
     setTxt('button[onclick="ignorerFichierTrieur()"]', 'sorter.skip_btn');
     setTxt('#btn-valider-trieur', 'sorter.save_next_btn');
     setTxt('#btn-valider-tout', 'sorter.apply_all_btn');
+    setTxt('#trieur-mode-rapide', 'sorter.mode_fast');
+    setTxt('#trieur-mode-prudent', 'sorter.mode_careful');
 
     // Modale Paramètres
     setTxt('#modal-settings h3', 'settings.title');
