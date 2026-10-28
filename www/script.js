@@ -712,6 +712,7 @@ function formatDureeHistorique(minutes) {
 function formatTonalite(tonalite) {
     if (!tonalite) return "";
     let res = tonalite.replace(/♭/g, 'b').replace(/♯/g, '#');
+    res = res.replace(/^([A-Ga-g][b#]?)-$/, '$1m');
     if (typeof getCurrentLang === 'function' && getCurrentLang() === 'en') {
         res = res.replace(/\bmajeur\b/gi, 'major').replace(/\bmineur\b/gi, 'minor');
     } else {
@@ -4416,7 +4417,8 @@ function renderBibliotheque(initialChunkSize = BIBLIO_CHUNK_SIZE) {
 function formaterAttributsItemUI(item) {
     if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.formatItemAttributes === 'function') {
         return window.LibraryDomain.formatItemAttributes(item, {
-            formatTonalite: typeof formatTonalite === 'function' ? formatTonalite : null
+            formatTonalite: typeof formatTonalite === 'function' ? formatTonalite : null,
+            includeTempo: false
         });
     }
     return '';

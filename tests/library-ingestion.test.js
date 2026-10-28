@@ -61,6 +61,38 @@ describe('library-domain - normalisation du compositeur iReal Pro', () => {
 });
 
 describe('library-domain - décodage iReal Pro', () => {
+    it('normalise les tonalités iReal Pro (tirets mineurs vers m)', () => {
+        const norm = LibraryDomain.normalizeIRealTonalite;
+        expect(norm('E-')).toBe('Em');
+        expect(norm('A-')).toBe('Am');
+        expect(norm('C-')).toBe('Cm');
+        expect(norm('Eb-')).toBe('Ebm');
+        expect(norm('F')).toBe('F');
+        expect(norm('Bb')).toBe('Bb');
+        expect(norm('F#')).toBe('F#');
+        expect(norm('Inconnu')).toBeNull();
+        expect(norm(null)).toBeNull();
+    });
+
+    it('décode le format standard iReal Pro 10-parties avec séparateur vide (ex: export 1460 songs)', () => {
+        const raw = 'irealb://26-2=Coltrane John==Medium Up Swing=F==1r34KcuZ...===500 Miles High=Corea Chick==Bossa Nova=E-==1r34...===Jazz 1460';
+        const r = LibraryDomain.parseIRealLink(raw);
+        expect(r.playlistName).toBe('Jazz 1460');
+        expect(r.tunes).toHaveLength(2);
+        expect(r.tunes[0]).toMatchObject({
+            titre: '26-2',
+            compositeur: 'John Coltrane',
+            style: 'Medium Up Swing',
+            tonalite: 'F'
+        });
+        expect(r.tunes[1]).toMatchObject({
+            titre: '500 Miles High',
+            compositeur: 'Chick Corea',
+            style: 'Bossa Nova',
+            tonalite: 'Em'
+        });
+    });
+
     it('décode une playlist irealb:// avec nom de playlist, compositeur inversé et article déplacé', () => {
         const raw = 'irealb://Autumn Leaves, The=Kosma Joseph=Medium Swing=Gm=n=T44{x}===Blue Bossa=Dorham Kenny=Bossa Nova=Cm=n=T44{y}===Ma Playlist';
         const r = LibraryDomain.parseIRealLink(raw);

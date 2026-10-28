@@ -63,6 +63,7 @@ describe('library-domain — Normalisation canonique des Items et Attributs d\'i
             }
         });
         expect(LibraryDomain.formatItemAttributes(full)).toBe('Miles Davis · Medium Swing · Dm · 136 BPM');
+        expect(LibraryDomain.formatItemAttributes(full, { includeTempo: false })).toBe('Miles Davis · Medium Swing · Dm');
 
         const partial = LibraryDomain.normalizeItem({
             id: 2,
@@ -104,6 +105,25 @@ describe('library-domain — Normalisation canonique des Items et Attributs d\'i
         expect(normalized.attributs.tonalite).toBeNull();
         expect(normalized.ireal_data.tona_origine).toBeNull();
         expect(normalized.attributs.style).toBe('Medium Swing');
+    });
+
+    it('auto-récupère la tonalité depuis ireal_data.grille si elle était absente ou perdue', () => {
+        const itemWithoutTona = {
+            id: 20,
+            titre: '26-2',
+            type_item: 'Morceaux',
+            attributs: {
+                compositeur: 'John Coltrane',
+                style: 'Medium Up Swing',
+                tonalite: null
+            },
+            ireal_data: {
+                grille: 'irealb://26-2=Coltrane John==Medium Up Swing=F==1r34KcuZ...'
+            }
+        };
+
+        const normalized = LibraryDomain.normalizeItem(itemWithoutTona);
+        expect(normalized.attributs.tonalite).toBe('F');
     });
 
     it('fournit les catégories par défaut FR et EN sans Projets/Projects ni références personnelles, et gère les Setlists comme sous-catégories de Morceaux', () => {

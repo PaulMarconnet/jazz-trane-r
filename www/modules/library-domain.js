@@ -32,6 +32,16 @@
         return /^[A-Ga-g][b#♭♯]?(?:\s*(?:m|min|mineur|maj|majeur|minor|major|-|\+|m7|Δ|o))?$/i.test(clean);
     }
 
+    function normalizeIRealTonalite(tona) {
+        if (!tona || typeof tona !== 'string') return null;
+        const clean = tona.trim();
+        if (!clean) return null;
+        const minorConverted = clean.replace(/^([A-Ga-g][b#♭♯]?)-$/, '$1m');
+        if (isValidTonalite(minorConverted)) return minorConverted;
+        if (isValidTonalite(clean)) return clean;
+        return null;
+    }
+
     const DEFAULT_CATEGORIES_FR = {
         'Voicings': ['II V I majeur', 'II V I mineur', 'Mineur', 'Majeur', 'Dominante', 'Diminué', 'Drop 2', 'So What', 'Autres'],
         'Patterns': ['Majeur', 'Mineur', 'Dominante', 'Pentatonique', 'Diminué', 'Autres'],
@@ -167,11 +177,20 @@
                 : (raw.compositeur !== undefined ? raw.compositeur : rawIreal.compositeur)
         );
 
-        const candidateTona = cleanNullableString(
+        let candidateTona = cleanNullableString(
             rawAttr.tonalite !== undefined ? rawAttr.tonalite
                 : (raw.tonalite !== undefined ? raw.tonalite : rawIreal.tona_origine)
         );
         const rescuedStyleFromTona = (candidateTona && isIrealStyle(candidateTona)) ? candidateTona : null;
+        if (rescuedStyleFromTona) candidateTona = null;
+
+        // Auto-récupération de la tonalité depuis ireal_data.grille si absente
+        if (!candidateTona && rawIreal.grille && typeof rawIreal.grille === 'string') {
+            const parsed = parseIRealLink(rawIreal.grille);
+            if (parsed.tunes.length > 0 && parsed.tunes[0].tonalite) {
+                candidateTona = parsed.tunes[0].tonalite;
+            }
+        }
 
         const explicitStyle = cleanNullableString(
             rawAttr.style !== undefined ? rawAttr.style
@@ -180,7 +199,9 @@
         );
         const style = explicitStyle || rescuedStyleFromSc || rescuedStyleFromTona || null;
 
-        const tonalite = (candidateTona && isValidTonalite(candidateTona)) ? candidateTona : null;
+        const tonalite = (candidateTona && isValidTonalite(candidateTona))
+            ? (normalizeIRealTonalite(candidateTona) || candidateTona)
+            : null;
 
         const tempo = cleanNullableTempo(
             rawAttr.tempo !== undefined ? rawAttr.tempo : raw.tempo
@@ -268,9 +289,11 @@
             parts.push(formatter ? formatter(tona) : tona);
         }
 
-        const tempo = cleanNullableTempo(attr.tempo);
-        if (tempo !== null) {
-            parts.push(`${tempo} BPM`);
+        if (!options || options.includeTempo !== false) {
+            const tempo = cleanNullableTempo(attr.tempo);
+            if (tempo !== null) {
+                parts.push(`${tempo} BPM`);
+            }
         }
 
         return parts.join(' · ');
@@ -487,11 +510,25 @@
                 const m = titre.match(/^(.*), (The|A|An|Le|La|Les)$/i);
                 if (m) titre = m[2] + ' ' + m[1];
                 const rawComp = (parts[1] || '').trim() || null;
+
+                let style = null;
+                let tonalite = null;
+
+                // Format export standard iReal Pro (avec séparateur vide parts[2] == "")
+                // ex: Titre=Compositeur==Style=Tonalité==Grille...
+                if (parts.length >= 6 && (!parts[2] || isIrealStyle(parts[3]) || isValidTonalite(normalizeIRealTonalite(parts[4])))) {
+                    style = (parts[3] || parts[2] || '').trim() || null;
+                    tonalite = normalizeIRealTonalite(parts[4]) || normalizeIRealTonalite(parts[3]);
+                } else {
+                    style = (parts[2] || '').trim() || null;
+                    tonalite = normalizeIRealTonalite(parts[3]);
+                }
+
                 result.tunes.push({
                     titre,
                     compositeur: normalizeComposerName(rawComp),
-                    style: (parts[2] || '').trim() || null,
-                    tonalite: (parts[3] || '').trim() || null,
+                    style,
+                    tonalite,
                     grille: 'irealb://' + chunk
                 });
             } else if (i === chunks.length - 1 && i > 0 && !chunk.includes('=')) {
@@ -673,6 +710,7 @@
         applyItemUpdate,
         isIrealStyle,
         isValidTonalite,
+        normalizeIRealTonalite,
         getDefaultCategories,
         isTunesCategory,
         isFavoritesLabel,
