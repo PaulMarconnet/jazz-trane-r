@@ -338,13 +338,34 @@
 
     <!-- VUE BIBLIOTHÈQUE -->
     <div id="vue-bibliotheque" style="display: none;">
-        <div class="header-creation" style="flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div class="header-creation" style="flex-direction: row; justify-content: space-between; align-items: center;">
             <h2>Bibliothèque musicale</h2>
+            <!-- BOUTON VIDER LA BIBLIOTHÈQUE (Réinitialiser) -->
+            <button class="btn-action btn-ghost-red" onclick="reinitialiserBibliotheque()" style="font-size: 13px; height: 32px;" id="btn-biblio-reset">
+                <svg viewBox="0 0 24 24"
+                    style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 6px;">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+                <span>Vider la bibliothèque</span>
+            </button>
+        </div>
+
+        <!-- BARRE D'ACTIONS BIBLIOTHÈQUE (Ajout/Import à gauche, Outils Dictaphone/Carnet à droite) -->
+        <div class="biblio-toolbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 10px; flex-wrap: wrap;">
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <!-- BOUTON + AJOUTER (Modale dédiée) -->
+                <!-- BOUTON + AJOUTER (Modale dédiée avec SVG plus identique à Séance) -->
                 <button type="button" id="btn-open-modal-item" class="btn-action btn-ghost-green" style="font-size: 13px; height: 32px;"
                     onclick="ouvrirModalItem()">
-                    <span>+ Ajouter</span>
+                    <svg viewBox="0 0 24 24"
+                        style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-right: 6px;">
+                        <path d="M5 12h14" />
+                        <path d="M12 5v14" />
+                    </svg>
+                    <span>Ajouter</span>
                 </button>
 
                 <!-- BOUTON IMPORTER ET TRIER (INBOX ZIP & MULTI-FICHIERS) -->
@@ -374,7 +395,9 @@
                 </button>
                 <input type="file" id="input-ireal-file" accept=".html,.htm,text/html,application/octet-stream" style="display: none;"
                     onchange="importerBackupIRealPro(event)">
+            </div>
 
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <!-- BOUTON DICTAPHONE (Bibliothèque) -->
                 <button type="button" id="btn-biblio-dictaphone" class="btn-action btn-ghost-neutral btn-square"
                     onclick="ouvrirModalDictaphone()" title="Dictaphone (Enregistreur)">
@@ -398,18 +421,6 @@
                         <path d="M2 18h4"/>
                         <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
                     </svg>
-                </button>
-
-                <!-- BOUTON RÉINITIALISER -->
-                <button class="btn-action btn-ghost-red" onclick="reinitialiserBibliotheque()" style="font-size: 13px; height: 32px;">
-                    <svg viewBox="0 0 24 24"
-                        style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: 6px;">
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                        <line x1="10" y1="11" x2="10" y2="17" />
-                        <line x1="14" y1="11" x2="14" y2="17" />
-                    </svg> Réinitialiser
                 </button>
             </div>
         </div>
@@ -882,7 +893,7 @@
                 <div class="form-row" style="display: flex; gap: 16px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
                     <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
                         <label id="label-vocab-nom" class="cadre-section-title">Titre</label>
-                        <input type="text" id="input-vocab-nom" placeholder="Titre..." required style="width: 100%;">
+                        <input type="text" id="input-vocab-nom" placeholder="Titre" required style="width: 100%;">
                     </div>
                     <div style="flex: 1 1 calc(50% - 8px); min-width: 200px;">
                         <label id="label-vocab-type" class="cadre-section-title">Catégorie</label>
@@ -903,21 +914,21 @@
                 <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
                     <div style="flex: 1 1 calc(50% - 6px); min-width: 180px;">
                         <label id="label-vocab-compositeur" class="cadre-section-title">Compositeur / Artiste</label>
-                        <input type="text" id="input-vocab-compositeur" placeholder="Ex : Bill Evans" style="width: 100%;">
+                        <input type="text" id="input-vocab-compositeur" placeholder="Compositeur / Artiste" style="width: 100%;">
                     </div>
                     <div style="flex: 1 1 calc(50% - 6px); min-width: 180px;">
                         <label id="label-vocab-style" class="cadre-section-title">Style</label>
-                        <input type="text" id="input-vocab-style" placeholder="Ex : Medium Swing, Waltz..." style="width: 100%;">
+                        <input type="text" id="input-vocab-style" placeholder="Style" style="width: 100%;">
                     </div>
                 </div>
                 <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; flex-wrap: wrap;">
                     <div style="flex: 1 1 calc(50% - 6px); min-width: 140px;">
                         <label id="label-vocab-tonalite" class="cadre-section-title">Tonalité</label>
-                        <input type="text" id="input-vocab-tonalite" placeholder="Ex : F, Cm, Bb..." style="width: 100%;">
+                        <input type="text" id="input-vocab-tonalite" placeholder="Tonalité" style="width: 100%;">
                     </div>
                     <div style="flex: 1 1 calc(50% - 6px); min-width: 140px;">
                         <label id="label-vocab-tempo" class="cadre-section-title">Tempo (BPM)</label>
-                        <input type="number" id="input-vocab-tempo" min="20" max="400" step="1" placeholder="Ex : 140" style="width: 100%;">
+                        <input type="number" id="input-vocab-tempo" min="20" max="400" step="1" placeholder="BPM" style="width: 100%;">
                     </div>
                 </div>
 
@@ -942,7 +953,7 @@
                     </div>
                 </div>
 
-                <div class="action-container" id="container-btn-vocab" style="justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                <div class="action-container" id="container-btn-vocab" style="justify-content: center; gap: 12px; margin-top: 20px;">
                     <button type="button" class="btn-action btn-ghost-neutral" id="btn-cancel-modal-item" onclick="fermerModalItem()">Annuler</button>
                     <button type="submit" class="btn-action btn-ghost-green" id="btn-submit-vocab">
                         <svg viewBox="0 0 24 24"
