@@ -45,7 +45,8 @@ describe('library-domain — Normalisation canonique des Items et Attributs d\'i
             stats: {
                 nb_pratiques: 7,
                 date_derniere_pratique: null
-            }
+            },
+            date_ajout: null
         });
     });
 
@@ -253,7 +254,35 @@ describe('library-domain — Normalisation canonique des Items et Attributs d\'i
             ireal_data: { grille: 'irealb://...', tona_origine: 'Ab' },
             cahier_data: null,
             favori: true,
-            stats: { nb_pratiques: 12, date_derniere_pratique: '2026-10-15' }
+            stats: { nb_pratiques: 12, date_derniere_pratique: '2026-10-15' },
+            date_ajout: null
         });
+    });
+
+    it('gère l\'attribut interne date_ajout (conservation, extraction depuis ID horodaté ou génération automatique)', () => {
+        // 1. Conservation d'une date_ajout explicite
+        const explicit = LibraryDomain.normalizeItem({
+            id: 1,
+            titre: 'Nardis',
+            date_ajout: '2026-03-15T10:00:00.000Z'
+        });
+        expect(explicit.date_ajout).toBe('2026-03-15T10:00:00.000Z');
+
+        // 2. Extraction depuis un ID horodaté
+        const timestamp = 1740000000000;
+        const fromTimestamp = LibraryDomain.normalizeItem({
+            id: timestamp,
+            titre: 'Blue in Green'
+        });
+        expect(fromTimestamp.date_ajout).toBe(new Date(timestamp).toISOString());
+
+        // 3. Génération automatique pour un nouvel item sans ID
+        const fresh = LibraryDomain.normalizeItem({ titre: 'Solar' });
+        expect(typeof fresh.date_ajout).toBe('string');
+        expect(Number.isNaN(new Date(fresh.date_ajout).getTime())).toBe(false);
+
+        // 4. Préservation lors d'une mise à jour applyItemUpdate
+        const updated = LibraryDomain.applyItemUpdate(explicit, { titre: 'Nardis (Edited)' });
+        expect(updated.date_ajout).toBe('2026-03-15T10:00:00.000Z');
     });
 });

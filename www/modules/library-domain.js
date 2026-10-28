@@ -212,6 +212,19 @@
         const nbPratiques = Math.max(0, parseInt(nbPratiquesRaw, 10) || 0);
         const dateDernierePratique = cleanNullableString(rawStats.date_derniere_pratique);
 
+        const rawDateAjout = cleanNullableString(raw.date_ajout || raw.date_creation);
+        const hasValidNumericId = (raw.id !== undefined && raw.id !== null && raw.id !== '' && Number.isFinite(rawId));
+        let dateAjout = rawDateAjout;
+        if (!dateAjout) {
+            if (!hasValidNumericId) {
+                dateAjout = new Date().toISOString();
+            } else if (rawId > 1600000000000 && rawId < 2500000000000) {
+                dateAjout = new Date(rawId).toISOString();
+            } else {
+                dateAjout = null;
+            }
+        }
+
         return {
             id,
             titre,
@@ -231,7 +244,8 @@
             stats: {
                 nb_pratiques: nbPratiques,
                 date_derniere_pratique: dateDernierePratique
-            }
+            },
+            date_ajout: dateAjout
         };
     }
 
@@ -270,6 +284,7 @@
         const merged = {
             ...base,
             id: base.id,
+            date_ajout: changes.date_ajout !== undefined ? changes.date_ajout : base.date_ajout,
             titre: changes.titre !== undefined ? changes.titre : (changes.nom !== undefined ? changes.nom : base.titre),
             type_item: changes.type_item !== undefined ? changes.type_item : base.type_item,
             sous_categories: changes.sous_categories !== undefined
