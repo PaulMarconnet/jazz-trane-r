@@ -2555,3 +2555,36 @@ button:focus:not(:focus-visible),
     align-items: center;
     margin-top: 2px;
 }
+
+/* Menu d'options 3 points (bibliothèque) : sobre, sans contour ni hover invasif */
+.btn-item-menu {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--text-muted) !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+}
+@media (hover: hover) and (pointer: fine) {
+    .btn-item-menu:hover:not(:disabled) {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: var(--text-muted) !important;
+        transform: none !important;
+    }
+}
+.btn-item-menu:active:not(:disabled),
+.dropdown.open .btn-item-menu {
+    border: none !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-primary) !important;
+    border-radius: 50% !important;
+}
+
+/* Grille réactive du choix prudent */
+@media (max-width: 480px) {
+    #trieur-choix-prudent {
+        grid-template-columns: 1fr !important;
+    }
+}

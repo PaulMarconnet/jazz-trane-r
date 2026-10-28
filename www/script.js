@@ -4468,7 +4468,7 @@ function renderBiblioChunk(chunkSize = BIBLIO_CHUNK_SIZE) {
                 ${audioBtnHtml}
                 <button class="${favBtnClass}" onclick="toggleFavori(${item.id}, event)" title="${t('common.favorite')}">${favIcon}</button>
                 <div class="dropdown" id="dd-item-menu-${item.id}">
-                    <button type="button" class="btn-action btn-ghost-neutral btn-square btn-item-menu" onclick="toggleDropdown('dd-item-menu-${item.id}', event)" title="${t('common.options')}">${svgDotsVertical}</button>
+                    <button type="button" class="btn-action btn-square btn-item-menu" onclick="toggleDropdown('dd-item-menu-${item.id}', event)" title="${t('common.options')}">${svgDotsVertical}</button>
                     <div class="dropdown-content item-menu-dropdown">
                         <button type="button" onclick="fermerTousLesDropdowns(); ouvrirModalItem(${item.id})">${svgPencil}<span>${t('common.edit')}</span></button>
                         <button type="button" class="item-menu-delete" onclick="fermerTousLesDropdowns(); supprimerVocabulaire(${item.id})">${svgTrash}<span>${t('common.delete')}</span></button>
@@ -8298,14 +8298,23 @@ async function demarrerImportTrieur() {
     if (trieurContext.isIReal) {
         const checkCreer = document.getElementById('trieur-checkbox-creer-setlist');
         const inputNom = document.getElementById('trieur-input-nom-setlist');
-        if (checkCreer && checkCreer.checked && inputNom && inputNom.value.trim()) {
-            const nomSetlist = inputNom.value.trim();
-            const catMorceaux = getNomCategorieMorceaux(SOUS_CATEGORIES);
-            if (!SOUS_CATEGORIES[catMorceaux]) SOUS_CATEGORIES[catMorceaux] = [];
-            if (!SOUS_CATEGORIES[catMorceaux].includes(nomSetlist)) {
-                SOUS_CATEGORIES[catMorceaux].push(nomSetlist);
-                sauvegarderCategoriesConfig(SOUS_CATEGORIES);
+        if (checkCreer && checkCreer.checked) {
+            const nomSetlist = inputNom ? inputNom.value.trim() : '';
+            if (!nomSetlist) {
+                alert(t('sorter.error_empty_setlist_name'));
+                if (inputNom) inputNom.focus();
+                return;
             }
+            const catCible = trieurCategorieGlobale || getNomCategorieMorceaux(SOUS_CATEGORIES);
+            const existantes = (SOUS_CATEGORIES[catCible] || []).map(s => s.toLowerCase().trim());
+            if (existantes.includes(nomSetlist.toLowerCase())) {
+                alert(t('sorter.error_setlist_exists', { name: nomSetlist }));
+                if (inputNom) inputNom.focus();
+                return;
+            }
+            if (!SOUS_CATEGORIES[catCible]) SOUS_CATEGORIES[catCible] = [];
+            SOUS_CATEGORIES[catCible].push(nomSetlist);
+            sauvegarderCategoriesConfig(SOUS_CATEGORIES);
             if (!trieurSousCategoriesGlobales.includes(nomSetlist)) {
                 trieurSousCategoriesGlobales.push(nomSetlist);
             }
@@ -8316,20 +8325,10 @@ async function demarrerImportTrieur() {
     document.getElementById('trieur-vue-cours').style.display = 'block';
     document.getElementById('trieur-vue-bilan').style.display = 'none';
 
-    if (trieurContext.mode === 'rapide') {
-        const modCreation = document.getElementById('trieur-mode-creation');
-        if (modCreation) modCreation.style.display = 'none';
-        const banner = document.getElementById('trieur-probable-banner');
-        if (banner) banner.style.display = 'none';
-        const modFusion = document.getElementById('trieur-mode-fusion');
-        if (modFusion) modFusion.style.display = 'none';
-        const btnIgnorer = document.getElementById('btn-trieur-ignorer');
-        if (btnIgnorer) btnIgnorer.style.display = 'none';
-        const btnCreer = document.getElementById('btn-trieur-creer');
-        if (btnCreer) btnCreer.style.display = 'none';
-        const btnFusionner = document.getElementById('btn-trieur-fusionner');
-        if (btnFusionner) btnFusionner.style.display = 'none';
-    }
+    const cadreExistant = document.getElementById('trieur-cadre-existant');
+    if (cadreExistant) cadreExistant.style.display = 'none';
+    const choixPrudent = document.getElementById('trieur-choix-prudent');
+    if (choixPrudent) choixPrudent.style.display = 'none';
 
     trieurTraitesCount = 0;
     majProgressionTrieur(0, trieurContext.totalInitial);
@@ -8440,7 +8439,18 @@ async function traiterSuiteTrieur() {
                 continue;
             }
 
-            // Arrêt nécessaire (nouvel item ou doublon probable)
+            if (match.type !== 'probable') {
+                // Nouvel item (<80% de similarité) : créé automatiquement même en Mode Prudent
+                trieurQueue.shift();
+                trieurTraitesCount++;
+                majProgressionTrieur(trieurTraitesCount, trieurContext.totalInitial);
+                const { b64Array, mime } = await lireEntreesInbox(nextFile);
+                await appliquerFichierInbox(nextFile, b64Array, mime, nextFile.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, null);
+                trieurStats.created++;
+                continue;
+            }
+
+            // Arrêt UNIQUEMENT si doublon probable (match.type === 'probable')
             currentInboxFile = trieurQueue.shift();
             const loaded = await lireEntreesInbox(currentInboxFile);
             currentInboxBase64Array = loaded.b64Array;
@@ -8450,36 +8460,19 @@ async function traiterSuiteTrieur() {
             const fileNameDisp = currentInboxFile.isIReal
                 ? `iReal Pro : ${currentInboxFile.titre}`
                 : `${currentInboxFile.baseName}.${currentInboxFile.ext}`;
-            document.getElementById('trieur-nom-fichier-courant').innerText = fileNameDisp;
-            document.getElementById('trieur-input-titre').value = currentInboxFile.titre;
+            const elCurrent = document.getElementById('trieur-nom-fichier-courant');
+            if (elCurrent) elCurrent.innerText = fileNameDisp;
 
-            itemFusionCible = null;
-            itemProbableCible = (match.type === 'probable') ? match.item : null;
+            const elExistant = document.getElementById('trieur-titre-existant');
+            if (elExistant) elExistant.innerText = match.item.titre;
 
-            document.getElementById('trieur-mode-creation').style.display = 'block';
-            document.getElementById('trieur-autocomplete-list').style.display = 'none';
-            document.getElementById('trieur-mode-fusion').style.display = 'none';
-            document.getElementById('btn-trieur-fusionner').style.display = 'none';
-            document.getElementById('btn-trieur-ignorer').style.display = 'inline-flex';
-            document.getElementById('btn-trieur-creer').style.display = 'inline-flex';
+            itemFusionCible = match.item;
+            itemProbableCible = match.item;
 
-            const badge = document.getElementById('trieur-action-badge');
-            if (badge) {
-                badge.className = 'badge badge-green';
-                badge.innerText = t('sorter.badge_new');
-            }
-
-            const banner = document.getElementById('trieur-probable-banner');
-            if (banner) {
-                if (match.type === 'probable') {
-                    banner.style.display = 'block';
-                    banner.innerText = t('sorter.did_you_mean', { title: match.item.titre });
-                    banner.onclick = () => activerModeFusion(match.item);
-                } else {
-                    banner.style.display = 'none';
-                    banner.onclick = null;
-                }
-            }
+            const cadreExistant = document.getElementById('trieur-cadre-existant');
+            if (cadreExistant) cadreExistant.style.display = 'block';
+            const choixPrudent = document.getElementById('trieur-choix-prudent');
+            if (choixPrudent) choixPrudent.style.display = 'grid';
             return;
         }
     }
@@ -8487,107 +8480,39 @@ async function traiterSuiteTrieur() {
     afficherBilanTrieur();
 }
 
-function activerModeFusion(itemExistant) {
-    itemFusionCible = itemExistant;
-    document.getElementById('trieur-mode-fusion').style.display = 'block';
-    document.getElementById('trieur-fusion-titre').innerText = itemExistant.titre;
-    document.getElementById('trieur-fusion-desc').innerText = (currentInboxFile && currentInboxFile.isIReal)
-        ? t('sorter.merge_desc_ireal')
-        : t('sorter.merge_desc_score');
-
-    const banner = document.getElementById('trieur-probable-banner');
-    if (banner) banner.style.display = 'none';
-
-    document.getElementById('btn-trieur-fusionner').style.display = 'inline-flex';
-    const badge = document.getElementById('trieur-action-badge');
-    if (badge) {
-        badge.className = 'badge badge-blue';
-        badge.innerText = t('sorter.badge_enrich');
-    }
-}
-
-function annulerFusionTrieur() {
-    itemFusionCible = null;
-    document.getElementById('trieur-mode-fusion').style.display = 'none';
-    document.getElementById('btn-trieur-fusionner').style.display = 'none';
-    document.getElementById('trieur-input-titre').value = (currentInboxFile ? currentInboxFile.titre : '');
-
-    const badge = document.getElementById('trieur-action-badge');
-    if (badge) {
-        badge.className = 'badge badge-green';
-        badge.innerText = t('sorter.badge_new');
-    }
-
-    if (itemProbableCible) {
-        const banner = document.getElementById('trieur-probable-banner');
-        if (banner) {
-            banner.style.display = 'block';
-            banner.innerText = t('sorter.did_you_mean', { title: itemProbableCible.titre });
-        }
-    }
-}
-
-function filtrerAutocompleteTrieur(val) {
-    const list = document.getElementById('trieur-autocomplete-list');
-    if (!list) return;
-    const query = LibraryDomain.canonicalTitle(val);
-    if (query.length < 2) { list.style.display = 'none'; return; }
-    const matches = vocabulaireCache.filter(v => v.type_item === trieurCategorieGlobale && LibraryDomain.canonicalTitle(v.titre).includes(query)).slice(0, 5);
-    if (matches.length > 0) {
-        list.innerHTML = "";
-        matches.forEach(m => {
-            const btn = document.createElement('button');
-            const hasScore = !!(m.fichier_image && ((Array.isArray(m.fichier_image) && m.fichier_image.length > 0) || (typeof m.fichier_image === 'string' && m.fichier_image.trim())));
-            const hasIReal = !!(m.ireal_data && m.ireal_data.grille);
-            const badges = [];
-            if (hasScore) badges.push(`<span class="match-source" style="color:var(--accent-blue);">${t('sorter.score_tag')}</span>`);
-            if (hasIReal) badges.push('<span class="match-source">iReal Pro</span>');
-            btn.innerHTML = `${m.titre} ${badges.join(' ')}`;
-            btn.onclick = () => { list.style.display = 'none'; activerModeFusion(m); };
-            list.appendChild(btn);
-        });
-        list.style.display = 'block';
-    } else {
-        list.style.display = 'none';
-    }
-}
-
-document.addEventListener('click', function (e) {
-    if (e.target && e.target.id !== 'trieur-input-titre') {
-        const list = document.getElementById('trieur-autocomplete-list');
-        if (list) list.style.display = 'none';
-    }
-});
-
-async function ignorerFichierTrieur() {
-    if (!currentInboxFile) return;
-    trieurTraitesCount++;
-    currentInboxFile = null;
-    itemFusionCible = null;
-    itemProbableCible = null;
-    await traiterSuiteTrieur();
-}
-
 async function validerCreationTrieur() {
     if (!currentInboxFile) return;
-    const titreFinal = document.getElementById('trieur-input-titre').value.trim() || currentInboxFile.titre || "Sans_Titre";
+    const titreFinal = currentInboxFile.titre || "Sans_Titre";
     await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, titreFinal, trieurCategorieGlobale, trieurSousCategoriesGlobales, null);
     trieurStats.created++;
     trieurTraitesCount++;
     currentInboxFile = null;
     itemFusionCible = null;
     itemProbableCible = null;
+
+    const cadreExistant = document.getElementById('trieur-cadre-existant');
+    if (cadreExistant) cadreExistant.style.display = 'none';
+    const choixPrudent = document.getElementById('trieur-choix-prudent');
+    if (choixPrudent) choixPrudent.style.display = 'none';
+
     await traiterSuiteTrieur();
 }
 
 async function validerFusionTrieur() {
     if (!currentInboxFile || !itemFusionCible) return;
+    // On conserve le titre existant dans la bibliothèque
     await appliquerFichierInbox(currentInboxFile, currentInboxBase64Array, currentInboxMime, itemFusionCible.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, itemFusionCible);
     trieurStats.merged++;
     trieurTraitesCount++;
     currentInboxFile = null;
     itemFusionCible = null;
     itemProbableCible = null;
+
+    const cadreExistant = document.getElementById('trieur-cadre-existant');
+    if (cadreExistant) cadreExistant.style.display = 'none';
+    const choixPrudent = document.getElementById('trieur-choix-prudent');
+    if (choixPrudent) choixPrudent.style.display = 'none';
+
     await traiterSuiteTrieur();
 }
 

@@ -164,12 +164,12 @@ describe('library-domain - modes de lot', () => {
         expect(r.summary.probableDuplicates[0].candidate.titre).toBe('Autum Leavs');
         expect(r.summary.probableDuplicates[0].probableMatch.titre).toBe('Autumn Leaves');
     });
-    it('Mode Prudent : fusionne les exacts puis s\'arrête sur le premier nouvel Item', () => {
+    it('Mode Prudent : fusionne les exacts, crée les nouveaux et s\'arrête sur le doublon probable', () => {
         const r = LibraryDomain.planBatch(cands, items, 'prudent');
-        expect(r.operations.map(o => o.kind)).toEqual(['merge']);
-        expect(r.pending).toHaveLength(2);
-        expect(r.stop).toMatchObject({ reason: 'new' });
-        expect(r.pending[0].titre).toBe('Giant Steps');
+        expect(r.operations.map(o => o.kind)).toEqual(['merge', 'create']);
+        expect(r.pending).toHaveLength(1);
+        expect(r.stop).toMatchObject({ reason: 'probable' });
+        expect(r.pending[0].titre).toBe('Autum Leavs');
     });
     it('Mode Prudent : s\'arrête sur un doublon probable', () => {
         const r = LibraryDomain.planBatch([cands[2]], items, 'prudent');

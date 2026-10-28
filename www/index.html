@@ -19,7 +19,7 @@
             document.documentElement.setAttribute('data-theme', t);
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=36">
+    <link rel="stylesheet" href="style.css?v=37">
     <script src="libs/Sortable.min.js"></script>
     <script src="libs/chart.min.js"></script>
     <script src="libs/jszip.min.js"></script>
@@ -1035,44 +1035,49 @@
                     <span class="close-modal" onclick="fermerTrieur()" style="position: static; font-size: 28px;">&times;</span>
                 </div>
 
-                <!-- Catégorie globale -->
-                <label id="trieur-prep-lbl-cat" class="cadre-section-title">Catégorie cible</label>
-                <div id="trieur-prep-chips-categorie" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;"></div>
+                <!-- CADRE 1 : DESTINATION (Catégorie, sous-catégories et option Setlist iReal Pro) -->
+                <div style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <!-- Catégorie globale -->
+                    <label id="trieur-prep-lbl-cat" class="cadre-section-title" style="margin-bottom: 8px;">Destination</label>
+                    <div id="trieur-prep-chips-categorie" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;"></div>
 
-                <!-- Sous-catégories / Setlists existantes -->
-                <div id="trieur-prep-bloc-sous-cat" style="margin-bottom: 20px;">
-                    <label id="trieur-prep-lbl-sous-cat" class="cadre-section-title">Sous-catégories</label>
-                    <div id="trieur-prep-chips-sous-cat" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
-                </div>
+                    <!-- Sous-catégories existantes -->
+                    <div id="trieur-prep-bloc-sous-cat" style="margin-bottom: 14px;">
+                        <label id="trieur-prep-lbl-sous-cat" class="cadre-section-title" style="margin-bottom: 8px;">Sous-catégories</label>
+                        <div id="trieur-prep-chips-sous-cat" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                    </div>
 
-                <!-- Bloc spécifique iReal Pro : Créer une Setlist -->
-                <div id="trieur-prep-bloc-ireal-setlist" style="display: none; background: var(--card-bg-elevated); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; margin-bottom: 20px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-primary);">
-                        <input type="checkbox" id="trieur-checkbox-creer-setlist" checked style="width: 18px; height: 18px; cursor: pointer;">
-                        <span id="trieur-lbl-creer-setlist">Créer une Setlist pour cet import</span>
-                    </label>
-                    <div id="trieur-champ-nom-setlist" style="margin-top: 10px;">
-                        <input type="text" id="trieur-input-nom-setlist" placeholder="Nom de la Setlist" style="width: 100%; font-size: 14px; padding: 8px 12px;">
+                    <!-- Option Setlist iReal Pro -->
+                    <div id="trieur-prep-bloc-ireal-setlist" style="display: none; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                        <label class="playlist-checkbox-item" style="border-bottom: none; padding: 0 0 8px 0;">
+                            <input type="checkbox" id="trieur-checkbox-creer-setlist" checked>
+                            <span id="trieur-lbl-creer-setlist" class="playlist-checkbox-label">Créer une Setlist pour cet import</span>
+                        </label>
+                        <div id="trieur-champ-nom-setlist" style="margin-top: 4px;">
+                            <input type="text" id="trieur-input-nom-setlist" placeholder="Nom de la Setlist" style="width: 100%; font-size: 14px; padding: 8px 12px;">
+                        </div>
                     </div>
                 </div>
 
-                <!-- Choix du Mode : 2 cartes multiline (style Paramètres) -->
-                <label id="trieur-prep-lbl-mode" class="cadre-section-title" style="margin-bottom: 8px;">Mode de traitement</label>
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px;">
-                    <button type="button" id="trieur-opt-mode-rapide" class="btn-action btn-multiline btn-ghost-blue active" onclick="choisirModeTrieur('rapide')">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><path d="m16 15-4-4-4 4"/><path d="m16 11-4-4-4 4"/></svg>
-                        <div>
-                            <strong style="display: block; font-size: 13px;">Rapide</strong>
-                            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Recommandé pour un premier import ou de nouveaux éléments</span>
-                        </div>
-                    </button>
-                    <button type="button" id="trieur-opt-mode-prudent" class="btn-action btn-multiline btn-ghost-neutral" onclick="choisirModeTrieur('prudent')">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        <div>
-                            <strong style="display: block; font-size: 13px;">Prudent</strong>
-                            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Recommandé pour compléter des éléments existants et éviter de potentiels doublons</span>
-                        </div>
-                    </button>
+                <!-- CADRE 2 : MODE DE TRAITEMENT (Rapide vs Prudent) -->
+                <div style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                    <label id="trieur-prep-lbl-mode" class="cadre-section-title" style="margin-bottom: 10px;">Mode de traitement</label>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button type="button" id="trieur-opt-mode-rapide" class="btn-action btn-multiline btn-ghost-blue active" onclick="choisirModeTrieur('rapide')">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><path d="m16 15-4-4-4 4"/><path d="m16 11-4-4-4 4"/></svg>
+                            <div>
+                                <strong style="display: block; font-size: 13px;">Rapide</strong>
+                                <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Recommandé pour un premier import ou de nouveaux éléments</span>
+                            </div>
+                        </button>
+                        <button type="button" id="trieur-opt-mode-prudent" class="btn-action btn-multiline btn-ghost-neutral" onclick="choisirModeTrieur('prudent')">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            <div>
+                                <strong style="display: block; font-size: 13px;">Prudent</strong>
+                                <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Recommandé pour compléter des éléments existants et éviter de potentiels doublons</span>
+                            </div>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Bouton Lancer -->
@@ -1100,47 +1105,41 @@
                     <span class="close-modal" onclick="fermerTrieur()" style="position: static; font-size: 28px; margin-left: 16px;">&times;</span>
                 </div>
 
-                <!-- Bannière d'information du fichier -->
-                <div style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; text-align: center;">
-                    <div style="font-size: 14px; font-weight: 500; color: var(--text-primary); word-break: break-all;">
-                        <span class="cadre-section-title" style="margin: 0; font-size: 11px; display: inline; text-transform: uppercase;">Fichier :</span>
-                        <span id="trieur-nom-fichier-courant" style="color: var(--accent-amber); font-weight: 600; margin-left: 6px;"></span>
+                <!-- 1. Fichier entrant -->
+                <div style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; text-align: center;">
+                    <span class="cadre-section-title" style="margin: 0; font-size: 11px; display: inline; text-transform: uppercase;">Fichier :</span>
+                    <span id="trieur-nom-fichier-courant" style="color: var(--accent-amber); font-weight: 600; margin-left: 6px; font-size: 14px; word-break: break-all;"></span>
+                </div>
+
+                <!-- 2. Fichier existant (affiché uniquement en arrêt doublon potentiel) -->
+                <div id="trieur-cadre-existant" style="display: none; background: var(--card-bg-elevated); border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                    <span class="cadre-section-title" style="margin: 0; font-size: 11px; display: inline; text-transform: uppercase;">Fichier existant :</span>
+                    <span id="trieur-titre-existant" style="color: var(--text-primary); font-weight: 600; margin-left: 6px; font-size: 14px; word-break: break-all;"></span>
+                </div>
+
+                <!-- 3. Les deux choix : Morceau différent (Créer) vs Même morceau (Fusionner) -->
+                <div id="trieur-choix-prudent" style="display: none; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px;">
+                    <!-- Option A : Morceau différent -->
+                    <div style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 14px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; gap: 12px;">
+                        <div>
+                            <strong id="trieur-opt-diff-title" style="display: block; font-size: 13.5px; color: var(--text-primary); margin-bottom: 4px;">C'est un morceau différent</strong>
+                            <span id="trieur-opt-diff-desc" style="font-size: 12px; color: var(--text-muted); line-height: 1.35; display: block;">Créer un nouvel élément séparé</span>
+                        </div>
+                        <button type="button" id="btn-trieur-creer" class="btn-action btn-ghost-neutral" style="height: 36px; padding: 0 20px; font-size: 13px; width: 100%; max-width: 140px;" onclick="validerCreationTrieur()">
+                            Créer
+                        </button>
                     </div>
-                </div>
 
-                <!-- Bannière cliquable doublon probable -->
-                <button type="button" id="trieur-probable-banner" class="btn-action btn-ghost-blue" style="display: none; width: 100%; margin-bottom: 14px; font-size: 13px; padding: 8px 12px; text-align: center; justify-content: center;"></button>
-
-                <!-- Mode Fusion -->
-                <div id="trieur-mode-fusion" style="display: none; background: rgba(88, 166, 255, 0.05); border: 1px solid rgba(88, 166, 255, 0.3); padding: 12px 14px; border-radius: 6px; margin-bottom: 16px;">
-                    <div class="cadre-section-title" style="margin-bottom: 4px;">Fusion avec l'élément existant :</div>
-                    <div id="trieur-fusion-titre" style="font-size: 16px; font-weight: 600; color: var(--text-primary);"></div>
-                    <div id="trieur-fusion-desc" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;"></div>
-                    <button type="button" class="btn-action btn-ghost-neutral" style="margin-top: 10px; font-size: 11px; height: 26px; padding: 0 10px;" onclick="annulerFusionTrieur()">
-                        Dissocier et créer un nouvel élément
-                    </button>
-                </div>
-
-                <!-- Saisie titre -->
-                <div id="trieur-mode-creation">
-                    <label class="cadre-section-title">Titre de l'élément</label>
-                    <div style="position: relative; margin-bottom: 16px;">
-                        <input type="text" id="trieur-input-titre" placeholder="Titre" style="font-size: 15px; padding: 8px 12px; width: 100%;" oninput="filtrerAutocompleteTrieur(this.value)" autocomplete="off">
-                        <div id="trieur-autocomplete-list" class="dropdown-content" style="width: 100%; max-height: 180px; overflow-y: auto; top: 100%; display: none;"></div>
+                    <!-- Option B : Même morceau -->
+                    <div style="background: var(--card-bg-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px 14px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; gap: 12px;">
+                        <div>
+                            <strong id="trieur-opt-same-title" style="display: block; font-size: 13.5px; color: var(--text-primary); margin-bottom: 4px;">C'est le même morceau</strong>
+                            <span id="trieur-opt-same-desc" style="font-size: 12px; color: var(--text-muted); line-height: 1.35; display: block;">Fusionner avec l'élément existant</span>
+                        </div>
+                        <button type="button" id="btn-trieur-fusionner" class="btn-action btn-ghost-neutral" style="height: 36px; padding: 0 20px; font-size: 13px; width: 100%; max-width: 140px;" onclick="validerFusionTrieur()">
+                            Fusionner
+                        </button>
                     </div>
-                </div>
-
-                <!-- Actions arrêt : Ignorer / Créer / Fusionner -->
-                <div style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
-                    <button type="button" id="btn-trieur-ignorer" class="btn-action btn-ghost-neutral" style="height: 36px; padding: 0 16px; font-size: 13px;" onclick="ignorerFichierTrieur()">
-                        Ignorer
-                    </button>
-                    <button type="button" id="btn-trieur-creer" class="btn-action btn-ghost-neutral" style="height: 36px; padding: 0 18px; font-size: 13px;" onclick="validerCreationTrieur()">
-                        Créer
-                    </button>
-                    <button type="button" id="btn-trieur-fusionner" class="btn-action btn-solid-green" style="height: 36px; padding: 0 18px; font-size: 13px; display: none;" onclick="validerFusionTrieur()">
-                        Fusionner
-                    </button>
                 </div>
             </div>
 
@@ -1952,14 +1951,14 @@
         </div>
     </div>
 
-    <script src="i18n.js?v=36"></script>
-    <script src="modules/library-domain.js?v=36"></script>
-    <script src="modules/session-timer.js?v=36"></script>
-    <script src="modules/history-analytics.js?v=36"></script>
-    <script src="modules/score-navigation.js?v=36"></script>
-    <script src="modules/storage-repo.js?v=36"></script>
-    <script src="modules/system-host.js?v=36"></script>
-    <script src="script.js?v=36"></script>
+    <script src="i18n.js?v=37"></script>
+    <script src="modules/library-domain.js?v=37"></script>
+    <script src="modules/session-timer.js?v=37"></script>
+    <script src="modules/history-analytics.js?v=37"></script>
+    <script src="modules/score-navigation.js?v=37"></script>
+    <script src="modules/storage-repo.js?v=37"></script>
+    <script src="modules/system-host.js?v=37"></script>
+    <script src="script.js?v=37"></script>
 </body>
 
 </html>

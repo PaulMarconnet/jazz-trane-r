@@ -635,11 +635,11 @@
                 operations.push({ kind: 'merge', item: merged, previous: m.item, candidate: cand });
                 continue;
             }
-            if (prudent) {
+            if (prudent && m.type === 'probable') {
                 return {
                     operations,
                     pending: list.slice(i),
-                    stop: { reason: m.type === 'probable' ? 'probable' : 'new', candidate: cand, match: m.item },
+                    stop: { reason: 'probable', candidate: cand, match: m.item, similarity: m.similarity },
                     summary: getBatchSummary(operations)
                 };
             }

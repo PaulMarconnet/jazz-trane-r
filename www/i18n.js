@@ -315,7 +315,7 @@ const I18N_DICT = {
         // Trieur Express
         "sorter.title": "Trieur Express",
         "sorter.prep_subtitle": "{count} fichier(s) prêt(s) à être importé(s)",
-        "sorter.target_cat": "Catégorie cible",
+        "sorter.target_cat": "Destination",
         "sorter.subcats_setlists": "Sous-catégories",
         "sorter.create_setlist_checkbox": "Créer une Setlist pour cet import",
         "sorter.setlist_name_placeholder": "Nom de la Setlist",
@@ -324,6 +324,13 @@ const I18N_DICT = {
         "sorter.mode_fast_desc": "Recommandé pour un premier import ou de nouveaux éléments",
         "sorter.mode_careful_title": "Prudent",
         "sorter.mode_careful_desc": "Recommandé pour compléter des éléments existants et éviter de potentiels doublons",
+        "sorter.choice_diff_title": "C'est un morceau différent",
+        "sorter.choice_diff_desc": "Créer un nouvel élément séparé",
+        "sorter.choice_same_title": "C'est le même morceau",
+        "sorter.choice_same_desc": "Fusionner avec l'élément existant",
+        "sorter.existing_file": "Fichier existant :",
+        "sorter.error_setlist_exists": "Une setlist nommée « {name} » existe déjà. Veuillez choisir un autre nom.",
+        "sorter.error_empty_setlist_name": "Veuillez entrer un nom pour la setlist.",
         "sorter.start_import_btn": "Lancer l'import ({count} fichiers)",
         "sorter.progress_file_n_of_total": "Fichier {current} sur {total}",
         "sorter.btn_skip": "Ignorer",
@@ -916,7 +923,7 @@ const I18N_DICT = {
         // Quick Sorter (Trieur Express)
         "sorter.title": "Quick Sorter",
         "sorter.prep_subtitle": "{count} file(s) ready to import",
-        "sorter.target_cat": "Target category",
+        "sorter.target_cat": "Destination",
         "sorter.subcats_setlists": "Subcategories",
         "sorter.create_setlist_checkbox": "Create a Setlist for this import",
         "sorter.setlist_name_placeholder": "Setlist name",
@@ -925,6 +932,13 @@ const I18N_DICT = {
         "sorter.mode_fast_desc": "Recommended for initial imports or brand new tunes",
         "sorter.mode_careful_title": "Careful",
         "sorter.mode_careful_desc": "Recommended when enriching existing tunes and preventing duplicates",
+        "sorter.choice_diff_title": "It's a different tune",
+        "sorter.choice_diff_desc": "Create a new separate tune",
+        "sorter.choice_same_title": "It's the same tune",
+        "sorter.choice_same_desc": "Merge with the existing tune",
+        "sorter.existing_file": "Existing file:",
+        "sorter.error_setlist_exists": "A setlist named \"{name}\" already exists. Please choose a different name.",
+        "sorter.error_empty_setlist_name": "Please enter a name for the setlist.",
         "sorter.start_import_btn": "Start import ({count} files)",
         "sorter.progress_file_n_of_total": "File {current} of {total}",
         "sorter.btn_skip": "Skip",
@@ -1540,14 +1554,11 @@ function appliquerTraductionsDOM() {
     setTxt('#trieur-opt-mode-rapide span', 'sorter.mode_fast_desc');
     setTxt('#trieur-opt-mode-prudent strong', 'sorter.mode_careful_title');
     setTxt('#trieur-opt-mode-prudent span', 'sorter.mode_careful_desc');
-    const fusionHead = document.querySelector('#trieur-mode-fusion > div:first-child');
-    if (fusionHead) fusionHead.textContent = t('sorter.matched_item');
-    setTxt('#trieur-fusion-desc', 'sorter.merge_desc_score');
-    setTxt('button[onclick="annulerFusionTrieur()"]', 'sorter.unlink_btn');
-    const trieurLabels = document.querySelectorAll('#trieur-mode-creation > label');
-    if (trieurLabels[0]) trieurLabels[0].textContent = t('sorter.item_title_label');
-    setPh('#trieur-input-titre', 'sorter.item_title_placeholder');
-    setTxt('#btn-trieur-ignorer', 'sorter.btn_skip');
+    setTxt('#trieur-cadre-existant span.cadre-section-title', 'sorter.existing_file');
+    setTxt('#trieur-opt-diff-title', 'sorter.choice_diff_title');
+    setTxt('#trieur-opt-diff-desc', 'sorter.choice_diff_desc');
+    setTxt('#trieur-opt-same-title', 'sorter.choice_same_title');
+    setTxt('#trieur-opt-same-desc', 'sorter.choice_same_desc');
     setTxt('#btn-trieur-creer', 'sorter.btn_create');
     setTxt('#btn-trieur-fusionner', 'sorter.btn_merge');
     setTxt('#trieur-vue-bilan h3', 'sorter.summary_title');
