@@ -432,14 +432,51 @@
         return `${prenom} ${nom}`;
     }
 
-    // Décode un lien/fichier/HTML contenant irealb:// (un morceau ou une playlist)
+    function safeDecodeURI(str) {
+        if (!str) return '';
+        try {
+            return decodeURIComponent(str);
+        } catch (e) {
+            try {
+                return decodeURIComponent(str.replace(/%(?![0-9a-fA-F]{2})/g, '%25'));
+            } catch (e2) {
+                return str.replace(/%([0-9a-fA-F]{2})/g, (_, hex) => {
+                    try { return String.fromCharCode(parseInt(hex, 16)); } catch (_) { return '%' + hex; }
+                });
+            }
+        }
+    }
+
+    function extractIRealPayload(src) {
+        if (!src || typeof src !== 'string') return '';
+        if (typeof DOMParser !== 'undefined' && /<[a-z][\s\S]*>/i.test(src)) {
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(src, 'text/html');
+                const link = doc.querySelector('a[href*="ireal"]');
+                if (link) {
+                    const href = link.getAttribute('href');
+                    if (href) return href.replace(/^ireal(?:b|book|pro)?:\/\//i, '').trim();
+                }
+            } catch (_) { }
+        }
+        const hrefMatch = src.match(/href=["'](ireal(?:b|book|pro)?:\/\/[\s\S]*?)["']/i);
+        if (hrefMatch && hrefMatch[1]) {
+            return hrefMatch[1].replace(/^ireal(?:b|book|pro)?:\/\//i, '').replace(/[\r\n]+/g, '').trim();
+        }
+        const directMatch = src.match(/ireal(?:b|book|pro)?:\/\/([^"'<>\r\n]+)/i);
+        if (directMatch && directMatch[1]) {
+            return directMatch[1].trim();
+        }
+        return '';
+    }
+
+    // Décode un lien/fichier/HTML contenant irealb://, irealbook:// ou irealpro:// (morceau ou playlist)
     function parseIRealLink(text) {
         const result = { playlistName: null, tunes: [] };
-        const src = String(text || '');
-        const idx = src.indexOf('irealb://');
-        if (idx === -1) return result;
-        let data = src.slice(idx + 'irealb://'.length).split(/["<>\r\n]/)[0].trim();
-        try { data = decodeURIComponent(data); } catch (e) { /* déjà décodé */ }
+        const rawPayload = extractIRealPayload(text);
+        if (!rawPayload) return result;
+        const data = safeDecodeURI(rawPayload);
         const chunks = data.split('===');
         for (let i = 0; i < chunks.length; i++) {
             const chunk = chunks[i].trim();

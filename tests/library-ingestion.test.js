@@ -77,6 +77,24 @@ describe('library-domain - décodage iReal Pro', () => {
         expect(r.tunes[0].compositeur).toBe('Miles Davis');
         expect(r.playlistName).toBeNull();
     });
+    it('décode les formats playlist irealbook:// dans du HTML avec guillemets simples ou retour à la ligne', () => {
+        const html = `<!DOCTYPE html><html><body>
+            <a href='irealbook://Autumn%20Leaves%2C%20The%3DKosma%20Joseph%3DMedium%20Swing%3DGm%3Dn%3DT44%7Bx%7D===\nBlue%20Bossa%3DDorham%20Kenny%3DBossa%20Nova%3DCm%3Dn%3DT44%7By%7D===Mes%20Morceaux'>x</a>
+        </body></html>`;
+        const r = LibraryDomain.parseIRealLink(html);
+        expect(r.playlistName).toBe('Mes Morceaux');
+        expect(r.tunes).toHaveLength(2);
+        expect(r.tunes[0].titre).toBe('The Autumn Leaves');
+        expect(r.tunes[1].titre).toBe('Blue Bossa');
+    });
+    it('décode sans crasher sur des symboles % non échappés dans les grilles', () => {
+        const raw = 'irealb://Take 5=Desmond Paul=Swing=Eb=n=| C | % |===Ma Playlist';
+        const r = LibraryDomain.parseIRealLink(raw);
+        expect(r.playlistName).toBe('Ma Playlist');
+        expect(r.tunes).toHaveLength(1);
+        expect(r.tunes[0].titre).toBe('Take 5');
+        expect(r.tunes[0].compositeur).toBe('Paul Desmond');
+    });
     it('retourne une liste vide sans lien', () => {
         expect(LibraryDomain.parseIRealLink('rien').tunes).toEqual([]);
     });

@@ -4790,7 +4790,7 @@ async function importerBackupIRealPro(event) {
 
 async function executerImportIRealPro(htmlContent, defaultName) {
     const decoded = LibraryDomain.parseIRealLink(htmlContent);
-    if (decoded.tunes.length === 0 && !htmlContent.includes('irealb://')) { alert(t('ireal.no_tunes_found')); return; }
+    if (decoded.tunes.length === 0 && !/ireal(?:b|book|pro)?:\/\//i.test(htmlContent)) { alert(t('ireal.no_tunes_found')); return; }
 
     const nomPlaylistDetecte = decoded.playlistName || defaultName || t('ireal.default_setlist_name');
 
@@ -8316,6 +8316,21 @@ async function demarrerImportTrieur() {
     document.getElementById('trieur-vue-cours').style.display = 'block';
     document.getElementById('trieur-vue-bilan').style.display = 'none';
 
+    if (trieurContext.mode === 'rapide') {
+        const modCreation = document.getElementById('trieur-mode-creation');
+        if (modCreation) modCreation.style.display = 'none';
+        const banner = document.getElementById('trieur-probable-banner');
+        if (banner) banner.style.display = 'none';
+        const modFusion = document.getElementById('trieur-mode-fusion');
+        if (modFusion) modFusion.style.display = 'none';
+        const btnIgnorer = document.getElementById('btn-trieur-ignorer');
+        if (btnIgnorer) btnIgnorer.style.display = 'none';
+        const btnCreer = document.getElementById('btn-trieur-creer');
+        if (btnCreer) btnCreer.style.display = 'none';
+        const btnFusionner = document.getElementById('btn-trieur-fusionner');
+        if (btnFusionner) btnFusionner.style.display = 'none';
+    }
+
     trieurTraitesCount = 0;
     majProgressionTrieur(0, trieurContext.totalInitial);
     await traiterSuiteTrieur();
@@ -8390,6 +8405,12 @@ async function traiterSuiteTrieur() {
             trieurTraitesCount++;
             majProgressionTrieur(trieurTraitesCount, trieurContext.totalInitial);
 
+            const fileNameDisp = nextFile.isIReal
+                ? `iReal Pro : ${nextFile.titre}`
+                : `${nextFile.baseName}.${nextFile.ext}`;
+            const elCurrent = document.getElementById('trieur-nom-fichier-courant');
+            if (elCurrent) elCurrent.innerText = fileNameDisp;
+
             const match = LibraryDomain.findMatch(vocabulaireCache, nextFile.titre, { categorie: trieurCategorieGlobale });
             const { b64Array, mime } = await lireEntreesInbox(nextFile);
 
@@ -8435,9 +8456,11 @@ async function traiterSuiteTrieur() {
             itemFusionCible = null;
             itemProbableCible = (match.type === 'probable') ? match.item : null;
 
+            document.getElementById('trieur-mode-creation').style.display = 'block';
             document.getElementById('trieur-autocomplete-list').style.display = 'none';
             document.getElementById('trieur-mode-fusion').style.display = 'none';
             document.getElementById('btn-trieur-fusionner').style.display = 'none';
+            document.getElementById('btn-trieur-ignorer').style.display = 'inline-flex';
             document.getElementById('btn-trieur-creer').style.display = 'inline-flex';
 
             const badge = document.getElementById('trieur-action-badge');
