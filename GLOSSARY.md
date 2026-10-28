@@ -1,0 +1,57 @@
+# Jazz Trane'R
+
+Application de pratique quotidienne pour musiciens de jazz : on prépare une séance minutée, on la joue avec ses partitions et outils, et on suit sa progression dans le temps.
+
+## Vues de travail
+
+**Vue Séance** :
+L'écran qui liste tous les exercices de la séance du jour, chacun avec son propre chronomètre.
+_Éviter_ : Mode Pupitre, vue Pratique
+
+**Mode Immersif** :
+La vue focalisée sur un seul exercice en cours, qui présente les éléments de bibliothèque correspondants (liste ou tirage au sort).
+_Éviter_ : Mode Pupitre, mode focus
+
+**Lecteur de Partition** :
+La vue plein écran qui affiche une partition (PDF, image, cahier manuscrit) avec ses outils d'annotation.
+_Éviter_ : Mode Pupitre, visionneuse, plein écran
+
+**Mode Live** :
+L'état du Lecteur de Partition ouvert depuis une Setlist, pour enchaîner les morceaux en situation de concert.
+_Éviter_ : Mode Concert, Mode Pupitre, gig mode
+
+**Cadre** :
+Un bloc visuel distinct qui regroupe une section d'une vue (délimité par un fond de carte et une bordure, avec un en-tête en petites majuscules).
+_Éviter_ : encart, panneau, boîte, form-section
+
+## Contenu
+
+**Item** :
+Toute fiche stockée dans la bibliothèque de l'utilisateur (morceau, lick, voicing, pattern, relevé, exercice technique, cahier manuscrit).
+_Éviter_ : vocabulaire, élément de bibliothèque, ressource
+
+**Attributs d'un item** :
+Les quatre métadonnées musicales facultatives attachées à un item : `compositeur` (ou artiste/source), `style` (incluant la sensation rythmique comme Waltz ou Ballad), `tonalite` et `tempo`. Distincts des catégories et sous-catégories de classement.
+_Éviter_ : métadonnées, tags, propriétés, métrique
+
+**Setlist** :
+Une liste ordonnée de morceaux destinée à être travaillée en séance ou jouée d'affilée en Mode Live.
+_Éviter_ : playlist
+
+**Routine** :
+Un programme de séance réutilisable, enregistré pour être rechargé tel quel lors de la préparation d'une séance.
+_Éviter_ : modèle, template
+
+## Organisation du travail (méthode de développement)
+
+**Roadmap** :
+La vision globale et à long terme du produit : ce à quoi l'application répond, son contenu cible et ses grandes orientations.
+_Éviter_ : feuille de route (pour un patch), plan
+
+**Spec** :
+Un lot d'évolutions à moyen terme, cohérent et livrable, découpé en tickets.
+_Éviter_ : patch, jalon principal, milestone
+
+**Ticket** :
+Une unité de travail d'une spec, implémentée dans une conversation dédiée et conclue par un commit.
+_Éviter_ : jalon, tâche, étape
