@@ -340,7 +340,7 @@ const I18N_DICT = {
         "sorter.summary_created": "Créés",
         "sorter.summary_merged": "Enrichis",
         "sorter.summary_probables": "Doublons probables créés",
-        "sorter.summary_probables_review": "Doublons probables créés (à revoir si souhaité) :",
+        "sorter.summary_probables_review": "Doublons probables créés",
         "sorter.summary_close_btn": "Terminer",
         "sorter.similar_to": "ressemble à",
         "sorter.items_left": "{count} élément(s) restant(s)",
@@ -948,7 +948,7 @@ const I18N_DICT = {
         "sorter.summary_created": "Created",
         "sorter.summary_merged": "Enriched",
         "sorter.summary_probables": "Probable duplicates created",
-        "sorter.summary_probables_review": "Probable duplicates created (review if desired):",
+        "sorter.summary_probables_review": "Probable duplicates created",
         "sorter.summary_close_btn": "Done",
         "sorter.similar_to": "similar to",
         "sorter.items_left": "{count} item(s) left",
@@ -1562,6 +1562,8 @@ function appliquerTraductionsDOM() {
     setTxt('#btn-trieur-creer', 'sorter.btn_create');
     setTxt('#btn-trieur-fusionner', 'sorter.btn_merge');
     setTxt('#trieur-vue-bilan h3', 'sorter.summary_title');
+    setTxt('#trieur-bilan-liste-probables-container .cadre-section-title', 'sorter.summary_probables_review');
+    setTxt('#trieur-vue-bilan button.btn-solid-green', 'sorter.summary_close_btn');
 
     // Modale Paramètres
     setTxt('#modal-settings h3', 'settings.title');

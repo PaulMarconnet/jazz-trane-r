@@ -8427,6 +8427,12 @@ async function traiterSuiteTrieur() {
         } else {
             // Mode Prudent
             const nextFile = trieurQueue[0];
+            const fileNameDisp = nextFile.isIReal
+                ? `iReal Pro : ${nextFile.titre}`
+                : `${nextFile.baseName}.${nextFile.ext}`;
+            const elCurrent = document.getElementById('trieur-nom-fichier-courant');
+            if (elCurrent) elCurrent.innerText = fileNameDisp;
+
             const match = LibraryDomain.findMatch(vocabulaireCache, nextFile.titre, { categorie: trieurCategorieGlobale });
 
             if (match.type === 'exact') {
@@ -8436,6 +8442,7 @@ async function traiterSuiteTrieur() {
                 const { b64Array, mime } = await lireEntreesInbox(nextFile);
                 await appliquerFichierInbox(nextFile, b64Array, mime, nextFile.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, match.item);
                 trieurStats.merged++;
+                await new Promise(r => setTimeout(r, 12));
                 continue;
             }
 
@@ -8447,6 +8454,7 @@ async function traiterSuiteTrieur() {
                 const { b64Array, mime } = await lireEntreesInbox(nextFile);
                 await appliquerFichierInbox(nextFile, b64Array, mime, nextFile.titre, trieurCategorieGlobale, trieurSousCategoriesGlobales, null);
                 trieurStats.created++;
+                await new Promise(r => setTimeout(r, 12));
                 continue;
             }
 
@@ -8457,10 +8465,6 @@ async function traiterSuiteTrieur() {
             currentInboxMime = loaded.mime;
             majProgressionTrieur(trieurTraitesCount + 1, trieurContext.totalInitial);
 
-            const fileNameDisp = currentInboxFile.isIReal
-                ? `iReal Pro : ${currentInboxFile.titre}`
-                : `${currentInboxFile.baseName}.${currentInboxFile.ext}`;
-            const elCurrent = document.getElementById('trieur-nom-fichier-courant');
             if (elCurrent) elCurrent.innerText = fileNameDisp;
 
             const elExistant = document.getElementById('trieur-titre-existant');
