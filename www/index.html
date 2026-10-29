@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 
 <head>
@@ -19,7 +19,7 @@
             document.documentElement.setAttribute('data-theme', t);
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=50">
+    <link rel="stylesheet" href="style.css?v=51">
     <script src="libs/Sortable.min.js"></script>
     <script src="libs/chart.min.js"></script>
     <script src="libs/jszip.min.js"></script>
@@ -1432,6 +1432,15 @@
                     Personnalisez les thèmes sonores des notifications et le clic du métronome.
                 </p>
                 <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Interrupteur Notifications Minuteur -->
+                    <div class="modal-cadre" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <label id="label-settings-notif-systeme" style="display: block; font-size: 13px; font-weight: 500;">Notifications de minuteur</label>
+                            <span id="desc-settings-notif-systeme" style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;">Alertes système en arrière-plan à la fin d'un exercice ou d'une pause</span>
+                        </div>
+                        <div id="btn-toggle-notifications-systeme" class="switch on" role="switch" aria-checked="true" onclick="toggleNotificationsSysteme()" title="Activer / désactiver les notifications de minuteur"></div>
+                    </div>
+
                     <!-- Thème notifications -->
                     <div class="modal-cadre" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
                         <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Thème sonore</label>
@@ -1936,6 +1945,23 @@
         </div>
     </div>
 
+    <!-- MODALE AUTORISATION MICROPHONE REQUISE (SETTINGS ANDROID) -->
+    <div id="modal-mic-permission" class="modal" style="display: none; z-index: 2800;">
+        <div class="modal-content" style="max-width: 440px; width: 92%; text-align: center; padding: 24px;">
+            <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(var(--accent-amber-rgb), 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; color: var(--accent-amber);">
+                <svg viewBox="0 0 24 24" style="width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+            <h3 id="modal-mic-permission-title" style="margin: 0 0 10px 0; font-size: 17px; font-weight: 600; color: var(--text-primary);">Autorisation microphone requise</h3>
+            <p id="modal-mic-permission-desc" style="color: var(--text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 20px 0;">
+                L'accès au microphone est nécessaire pour enregistrer vos prises dans le Dictaphone. Vous avez refusé cette autorisation dans les paramètres de votre appareil.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <button type="button" class="btn-action btn-ghost-neutral" onclick="fermerModalMicPermission()">Fermer</button>
+                <button type="button" id="btn-ouvrir-parametres-android" class="btn-action btn-ghost-blue" onclick="ouvrirParametresAndroidApp()">Ouvrir les paramètres Android</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODALE CHOIX RAPIDE TYPE DE PORTÉE (CAHIER) -->
     <div id="modal-cahier-choix" class="modal" style="display: none; z-index: 2500;">
         <div class="modal-content" style="max-width: 440px; width: 92%; padding: 22px;">
@@ -2071,14 +2097,14 @@
         </div>
     </div>
 
-    <script src="i18n.js?v=50"></script>
-    <script src="modules/library-domain.js?v=50"></script>
-    <script src="modules/session-timer.js?v=50"></script>
-    <script src="modules/history-analytics.js?v=50"></script>
-    <script src="modules/score-navigation.js?v=50"></script>
-    <script src="modules/storage-repo.js?v=50"></script>
-    <script src="modules/system-host.js?v=50"></script>
-    <script src="script.js?v=50"></script>
+    <script src="i18n.js?v=51"></script>
+    <script src="modules/library-domain.js?v=51"></script>
+    <script src="modules/session-timer.js?v=51"></script>
+    <script src="modules/history-analytics.js?v=51"></script>
+    <script src="modules/score-navigation.js?v=51"></script>
+    <script src="modules/storage-repo.js?v=51"></script>
+    <script src="modules/system-host.js?v=51"></script>
+    <script src="script.js?v=51"></script>
 </body>
 
 </html>

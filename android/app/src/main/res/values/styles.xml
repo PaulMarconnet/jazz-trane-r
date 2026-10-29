@@ -20,8 +20,8 @@
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
-        <item name="android:background">@drawable/splash</item>
-        <item name="android:windowSplashScreenBackground">#0a0c10</item>
+        <item name="android:background">@drawable/splash_background</item>
+        <item name="android:windowSplashScreenBackground">#110d0a</item>
         <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>

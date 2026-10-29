@@ -5,6 +5,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.net.Uri;
+import android.provider.Settings;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.OutputStream;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -65,18 +69,11 @@ public class MainActivity extends BridgeActivity {
         // Enregistrer le bridge JavaScript pour la réception de partages iReal Pro
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().addJavascriptInterface(new ShareBridge(), "NativeShareBridge");
+            bridge.getWebView().addJavascriptInterface(new SystemBridge(), "NativeSystemBridge");
         }
 
         // Traiter l'intent au démarrage à froid
         traiterIntentPartage(getIntent());
-
-        // Demande préventive de la permission audio si non accordée
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.MODIFY_AUDIO_SETTINGS
-            }, PERMISSION_REQ_CODE);
-        }
     }
 
     @Override
@@ -84,6 +81,7 @@ public class MainActivity extends BridgeActivity {
         super.onResume();
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().addJavascriptInterface(new ShareBridge(), "NativeShareBridge");
+            bridge.getWebView().addJavascriptInterface(new SystemBridge(), "NativeSystemBridge");
         }
         activerModePleinEcranImmersif();
     }
@@ -167,6 +165,92 @@ public class MainActivity extends BridgeActivity {
                 Log.e(TAG, "Erreur JSON intent partagé : " + e.getMessage());
             }
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Seam systeme : "Enregistrer sous..." (SAF), micro, reglages app
+    // ---------------------------------------------------------------
+    private static final int REQ_CREATE_DOCUMENT = 2001;
+    private String pendingSaveCacheName = null;
+
+    public class SystemBridge {
+        @android.webkit.JavascriptInterface
+        public void saveToDocument(String cacheFileName, String displayName, String mime) {
+            runOnUiThread(() -> {
+                pendingSaveCacheName = cacheFileName;
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType(mime != null && !mime.isEmpty() ? mime : "application/octet-stream");
+                intent.putExtra(Intent.EXTRA_TITLE, displayName);
+                startActivityForResult(intent, REQ_CREATE_DOCUMENT);
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean checkMicrophone() {
+            return ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED;
+        }
+
+        @android.webkit.JavascriptInterface
+        public void requestMicrophone() {
+            runOnUiThread(() -> ActivityCompat.requestPermissions(MainActivity.this, new String[]{
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.MODIFY_AUDIO_SETTINGS
+            }, PERMISSION_REQ_CODE));
+        }
+
+        @android.webkit.JavascriptInterface
+        public void openAppSettings() {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.fromParts("package", getPackageName(), null));
+                startActivity(intent);
+            });
+        }
+    }
+
+    private void notifierWeb(String fn, String arg) {
+        runOnUiThread(() -> {
+            if (bridge != null && bridge.getWebView() != null) {
+                bridge.getWebView().evaluateJavascript("window." + fn + " && window." + fn + "(" + arg + ");", null);
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_CREATE_DOCUMENT) return;
+        String cacheName = pendingSaveCacheName;
+        pendingSaveCacheName = null;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null || cacheName == null) {
+            notifierWeb("onNativeSaveResult", "false");
+            return;
+        }
+        try (InputStream in = new FileInputStream(new File(getCacheDir(), cacheName));
+             OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = in.read(buffer)) != -1) out.write(buffer, 0, len);
+            out.flush();
+            notifierWeb("onNativeSaveResult", "true");
+        } catch (Exception e) {
+            Log.e(TAG, "Erreur ecriture sauvegarde : " + e.getMessage());
+            notifierWeb("onNativeSaveResult", "false");
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != PERMISSION_REQ_CODE) return;
+        boolean granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED;
+        String result = granted ? "granted"
+            : (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO)
+                ? "permanently_denied" : "denied");
+        notifierWeb("onNativeMicResult", "'" + result + "'");
     }
 
     @SuppressWarnings("deprecation")

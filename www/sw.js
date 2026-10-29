@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jazz-traner-v50';
+const CACHE_NAME = 'jazz-traner-v51';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

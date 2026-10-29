@@ -450,6 +450,11 @@ const I18N_DICT = {
         "dictaphone.subcat_detail": " (sous-catégorie \"{sub}\")",
         "dictaphone.save_error": "Erreur lors de l'enregistrement dans la bibliothèque : {error}",
         "dictaphone.file_prefix": "enregistrement",
+        "dictaphone.mic_permission_title": "Autorisation microphone requise",
+        "dictaphone.mic_permission_desc": "L'accès au microphone est nécessaire pour enregistrer vos prises dans le Dictaphone. Vous avez refusé cette autorisation dans les paramètres de votre appareil.",
+        "dictaphone.open_settings_btn": "Ouvrir les paramètres Android",
+        "settings.notif_system_label": "Notifications système de minuteur",
+        "settings.notif_system_desc": "Alerte silencieuse au premier plan et notification dédiée en arrière-plan à la fin d'un minuteur",
 
         // Paramètres
         "settings.title": "Paramètres",
@@ -1069,6 +1074,11 @@ const I18N_DICT = {
         "dictaphone.subcat_detail": " (subcategory \"{sub}\")",
         "dictaphone.save_error": "Error saving to library: {error}",
         "dictaphone.file_prefix": "recording",
+        "dictaphone.mic_permission_title": "Microphone Permission Required",
+        "dictaphone.mic_permission_desc": "Microphone access is required to record takes with the Dictaphone. You have permanently denied this permission in your device settings.",
+        "dictaphone.open_settings_btn": "Open Android Settings",
+        "settings.notif_system_label": "System timer notifications",
+        "settings.notif_system_desc": "Silent foreground alert and dedicated background notification when a timer ends",
 
         // Settings
         "settings.title": "Settings",
@@ -1646,6 +1656,11 @@ function appliquerTraductionsDOM() {
     setTxt('#select-settings-metronome-theme option[value="clic"]', 'settings.metro_click');
     setTxt('#select-settings-metronome-theme option[value="bip"]', 'settings.metro_beep');
     setTitle('button[onclick="testerSonMetronome()"]', 'settings.test_metro_title');
+    setTxt('#label-settings-notif-systeme', 'settings.notif_system_label');
+    setTxt('#desc-settings-notif-systeme', 'settings.notif_system_desc');
+    setTxt('#modal-mic-permission-title', 'dictaphone.mic_permission_title');
+    setTxt('#modal-mic-permission-desc', 'dictaphone.mic_permission_desc');
+    setTxt('#btn-ouvrir-parametres-android', 'dictaphone.open_settings_btn');
 
     setTxt('#settings-lang-desc', 'settings.language_intro');
     setTxt('#settings-theme-desc', 'settings.theme_intro');

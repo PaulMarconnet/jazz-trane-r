@@ -1,4 +1,4 @@
-const DB_NAME = "PianoWorkoutDB";
+﻿const DB_NAME = "PianoWorkoutDB";
 let localDB = null;
 
 // ==========================================
@@ -266,124 +266,178 @@ async function apiFetch(endpoint, options = {}) {
         delete parsedBody.supprimer_partition;
     }
 
-    if (method === 'GET') {
-        const list = await lireLocal(resource) || [];
-        if (resource === 'vocabulaire' && typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.normalizeItem === 'function') {
-            return list.map(item => window.LibraryDomain.normalizeItem(item));
-        }
-        return list;
-    }
-    if (method === 'DELETE') {
-        if (id === 'reset') {
-            await viderStore(resource);
-        } else if (id) {
-            const numId = Number(id);
-            if (!isNaN(numId)) {
-                await ecrireLocal(resource, numId, 'delete');
-            }
-            await ecrireLocal(resource, String(id), 'delete');
-        }
-        return { success: true };
-    }
-    if (action === 'terminer' && resource === 'seances') {
-        const toutesSeances = await lireLocal('seances');
-        let active = toutesSeances.find(s => String(s.id) === String(id) || (id && Number(s.id) === Number(id)));
-        if (!active) {
-            // Repli : trouver la plus récente séance non terminée
-            active = toutesSeances.slice().reverse().find(s => s.statut !== 'terminee');
-        }
-        if (active) {
-            active.statut = 'terminee';
-            if (parsedBody.duree !== undefined) active.duree_reelle = parsedBody.duree;
-            if (parsedBody.date_seance) active.date_seance = parsedBody.date_seance;
-            if (parsedBody.items) active.items = parsedBody.items;
-            await ecrireLocal('seances', active);
-        } else {
-            // Si aucune séance n'était active, créer la séance terminée directement pour l'historique
-            active = {
-                id: (id && !isNaN(Number(id))) ? Number(id) : Date.now(),
-                statut: 'terminee',
-                duree_reelle: parsedBody.duree || 0,
-                date_seance: parsedBody.date_seance || new Date().toISOString().split('T')[0],
-                items: parsedBody.items || []
-            };
-            await ecrireLocal('seances', active);
-        }
-        return active;
-    }
-    if (action === 'pratiquer' && resource === 'vocabulaire') {
-        const items = await lireLocal('vocabulaire');
-        const item = items.find(i => i.id === parseInt(id));
-        if (item) {
-            item.stats = item.stats || { nb_pratiques: 0, date_derniere_pratique: null };
-            item.stats.nb_pratiques += 1; item.stats.date_derniere_pratique = new Date().toISOString().split('T')[0];
-            item.nb_pratiques = item.stats.nb_pratiques; await ecrireLocal('vocabulaire', item);
-        }
-        return item;
-    }
-    if (action === 'depratiquer' && resource === 'vocabulaire') {
-        const items = await lireLocal('vocabulaire');
-        const item = items.find(i => i.id === parseInt(id));
-        if (item) {
-            item.stats = item.stats || { nb_pratiques: 1, date_derniere_pratique: null };
-            item.stats.nb_pratiques = Math.max(0, (item.stats.nb_pratiques || 0) - 1);
-            item.nb_pratiques = item.stats.nb_pratiques;
-            await ecrireLocal('vocabulaire', item);
-        }
-        return item;
-    }
-    if (action === 'favori' && resource === 'vocabulaire') {
-        const items = await lireLocal('vocabulaire');
-        const item = items.find(i => i.id === parseInt(id));
-        if (item) { item.favori = !item.favori; await ecrireLocal('vocabulaire', item); return { favori: item.favori }; }
-    }
-    if (method === 'POST') {
-        parsedBody.id = Date.now() + Math.floor(Math.random() * 1000000);
-        if (resource === 'seances') parsedBody.statut = 'en_cours';
-        if (resource === 'vocabulaire') {
-            if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.normalizeItem === 'function') {
-                parsedBody = window.LibraryDomain.normalizeItem(parsedBody);
-            } else {
-                parsedBody.titre = parsedBody.nom || parsedBody.titre; delete parsedBody.nom;
-                parsedBody.stats = { nb_pratiques: 0, date_derniere_pratique: null };
-                parsedBody.ireal_data = { grille: null, tona_origine: null };
-            }
-        }
-        await ecrireLocal(resource, parsedBody); return parsedBody;
-    }
+    const repo = getStorageRepo();
+    if (method === 'GET') return (await repo.list(resource)) || [];
+    if (method === 'DELETE') return id === 'reset' ? repo.reset(resource) : repo.remove(resource, id);
+    if (resource === 'seances' && action === 'terminer') return repo.finishSession(id, parsedBody);
+    if (resource === 'vocabulaire' && action === 'pratiquer') return repo.practice(id);
+    if (resource === 'vocabulaire' && action === 'depratiquer') return repo.unpractice(id);
+    if (resource === 'vocabulaire' && action === 'favori') return (await repo.toggleFavorite(id)) || {};
+    if (method === 'POST') return repo.create(resource, parsedBody);
     if (method === 'PUT') {
-        if (id) parsedBody.id = parseInt(id);
-
-        if (resource === 'vocabulaire') {
-            if (parsedBody.nom) { parsedBody.titre = parsedBody.nom; delete parsedBody.nom; }
-
-            // 1. On récupère l'ancien objet pour ne rien écraser à l'aveugle
-            const existants = await lireLocal(resource);
-            const itemExistant = existants.find(i => i.id === parsedBody.id);
-
-            if (itemExistant) {
-                if (options.body instanceof FormData) {
-                    if (parsedBody.fichier_image === undefined && (!options.body.get || options.body.get('supprimer_partition') !== 'true')) {
-                        parsedBody.fichier_image = itemExistant.fichier_image;
-                    }
-                    if (parsedBody.fichier_audio === undefined && (!options.body.get || options.body.get('supprimer_audio') !== 'true')) {
-                        parsedBody.fichier_audio = itemExistant.fichier_audio;
-                    }
-                }
-                if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.applyItemUpdate === 'function') {
-                    parsedBody = window.LibraryDomain.applyItemUpdate(itemExistant, parsedBody);
-                } else {
-                    parsedBody = { ...itemExistant, ...parsedBody };
-                }
-            } else if (typeof window !== 'undefined' && window.LibraryDomain && typeof window.LibraryDomain.normalizeItem === 'function') {
-                parsedBody = window.LibraryDomain.normalizeItem(parsedBody);
+        if (resource === 'vocabulaire' && options.body instanceof FormData) {
+            const existant = await repo.getById(resource, id);
+            if (existant) {
+                if (parsedBody.fichier_image === undefined && options.body.get('supprimer_partition') !== 'true') parsedBody.fichier_image = existant.fichier_image;
+                if (parsedBody.fichier_audio === undefined && options.body.get('supprimer_audio') !== 'true') parsedBody.fichier_audio = existant.fichier_audio;
             }
         }
-
-        await ecrireLocal(resource, parsedBody);
-        return parsedBody;
+        return repo.update(resource, id, parsedBody);
     }
     return {};
+}
+
+// Dépôt de persistance (module storage-repo) : seam stores IndexedDB + seam fichiers (Filesystem Android / IndexedDB Web)
+let _storageRepo = null;
+// Dépôt système hôte (module system-host) : notifications, sauvegardes SAF/Picker, micro & permissions
+let _systemHost = null;
+function getSystemHost() {
+    if (_systemHost) return _systemHost;
+    const estNatif = () => !!(window.Capacitor && Capacitor.isNativePlatform());
+    const adapter = {
+        scheduleNotification: async (spec) => {
+            if (estNatif()) {
+                const { LocalNotifications } = Capacitor.Plugins;
+                await LocalNotifications.schedule({
+                    notifications: [{
+                        id: spec.id,
+                        title: spec.title,
+                        body: spec.body,
+                        schedule: { at: spec.at, allowWhileIdle: true },
+                        channelId: spec.channelId || 'timer_alerts',
+                        smallIcon: spec.smallIcon || 'ic_stat_jazz_traner',
+                        iconColor: spec.color || '#e3a24a'
+                    }]
+                });
+            } else if ('Notification' in window && Notification.permission === 'granted') {
+                const delayMs = spec.at.getTime() - Date.now();
+                if (delayMs > 0) {
+                    window._webNotifHostTimer = setTimeout(() => {
+                        try {
+                            new Notification(spec.title, { body: spec.body });
+                        } catch (e) { }
+                    }, delayMs);
+                }
+            }
+        },
+        cancelNotification: async (id) => {
+            if (window._webNotifHostTimer) {
+                clearTimeout(window._webNotifHostTimer);
+                window._webNotifHostTimer = null;
+            }
+            if (estNatif()) {
+                try {
+                    const { LocalNotifications } = Capacitor.Plugins;
+                    await LocalNotifications.cancel({ notifications: [{ id }] });
+                } catch (e) { }
+            }
+        },
+        saveFile: async ({ name, blob, mime }) => {
+            return telechargerFichierSysteme(blob, name, mime);
+        },
+        checkMicrophone: async () => {
+            if (window.NativeSystemBridge && typeof window.NativeSystemBridge.checkMicrophone === 'function') {
+                return window.NativeSystemBridge.checkMicrophone();
+            }
+            return true;
+        },
+        requestMicrophone: () => {
+            return new Promise((resolve) => {
+                if (window.NativeSystemBridge && typeof window.NativeSystemBridge.requestMicrophone === 'function') {
+                    window.onNativeMicResult = (res) => {
+                        window.onNativeMicResult = null;
+                        resolve(res);
+                    };
+                    window.NativeSystemBridge.requestMicrophone();
+                } else {
+                    resolve('granted');
+                }
+            });
+        },
+        openAppSettings: async () => {
+            if (window.NativeSystemBridge && typeof window.NativeSystemBridge.openAppSettings === 'function') {
+                window.NativeSystemBridge.openAppSettings();
+            }
+        }
+    };
+
+    _systemHost = window.SystemHost.createHost({
+        adapter,
+        getVisibility: () => document.visibilityState,
+        isNotificationsEnabled: () => sontNotificationsActivees()
+    });
+    return _systemHost;
+}
+
+function sontNotificationsActivees() {
+    return localStorage.getItem('piano_workout_notifications_timer') !== 'false';
+}
+
+function toggleNotificationsSysteme() {
+    const act = !sontNotificationsActivees();
+    localStorage.setItem('piano_workout_notifications_timer', act ? 'true' : 'false');
+    majToggleNotificationsUI();
+    if (!act && typeof getSystemHost === 'function') {
+        getSystemHost().disarmTimerNotification();
+    }
+}
+
+function majToggleNotificationsUI() {
+    const sw = document.getElementById('btn-toggle-notifications-systeme');
+    if (!sw) return;
+    const act = sontNotificationsActivees();
+    if (act) {
+        sw.classList.add('on');
+        sw.setAttribute('aria-checked', 'true');
+    } else {
+        sw.classList.remove('on');
+        sw.setAttribute('aria-checked', 'false');
+    }
+}
+
+function ouvrirModalMicPermission() {
+    const modal = document.getElementById('modal-mic-permission');
+    if (modal) modal.style.display = 'flex';
+}
+
+function fermerModalMicPermission() {
+    const modal = document.getElementById('modal-mic-permission');
+    if (modal) modal.style.display = 'none';
+}
+
+async function ouvrirParametresAndroidApp() {
+    fermerModalMicPermission();
+    if (typeof getSystemHost === 'function') {
+        await getSystemHost().openAppSettings();
+    }
+}
+
+function getStorageRepo() {
+    if (_storageRepo) return _storageRepo;
+    const estNatif = () => !!(window.Capacitor && Capacitor.isNativePlatform());
+    _storageRepo = window.StorageRepo.createRepo({
+        domain: window.LibraryDomain,
+        store: {
+            getAll: async (name) => (await lireLocal(name)) || [],
+            getById: async (name, id) => (await lireLocalId(name, id)) || null,
+            put: (name, obj) => ecrireLocal(name, obj, 'put'),
+            delete: (name, id) => ecrireLocal(name, id, 'delete'),
+            clear: (name) => viderStore(name)
+        },
+        files: {
+            write: (name, dataUrl) => sauvegarderFichierLocal(name, dataUrl),
+            read: async (name) => {
+                if (estNatif()) {
+                    const r = await Capacitor.Plugins.Filesystem.readFile({ path: name, directory: 'DATA' });
+                    return r && r.data ? `data:${window.StorageRepo.mimeFromExtension(name.split('.').pop())};base64,${r.data}` : null;
+                }
+                const img = await lireLocalId('images', name);
+                return img ? img.base64 : null;
+            },
+            list: async () => estNatif() ? [] : ((await lireLocal('images')) || []).map(i => i.id)
+        }
+    });
+    return _storageRepo;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -2502,7 +2556,14 @@ function reinitialiserUIDictaphone() {
     majBoutonBiblioDictaphone();
 }
 
-function ouvrirModalDictaphone(targetItemId = null) {
+async function ouvrirModalDictaphone(targetItemId = null) {
+    if (typeof getSystemHost === 'function') {
+        const micStatus = await getSystemHost().ensureMicrophone();
+        if (micStatus === 'permanently_denied') {
+            ouvrirModalMicPermission();
+            return;
+        }
+    }
     if (!targetItemId && typeof isPupitreActive !== 'undefined' && isPupitreActive && typeof currentShuffleQueue !== 'undefined' && Array.isArray(currentShuffleQueue) && currentShuffleQueue.length > currentShuffleIndex && currentShuffleIndex >= 0) {
         targetItemId = currentShuffleQueue[currentShuffleIndex].id;
     }
@@ -2716,7 +2777,11 @@ async function demarrerEnregistrementDictaphone() {
         animerVisualiseurMicro();
     } catch (err) {
         console.error("Erreur accès microphone :", err);
-        alert(t('dictaphone.mic_error_alert', { err: err.message || err.name || "Permission error" }));
+        if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'SecurityError')) {
+            ouvrirModalMicPermission();
+        } else {
+            alert(t('dictaphone.mic_error_alert', { err: err.message || err.name || "Permission error" }));
+        }
         reinitialiserUIDictaphone();
     }
 }
@@ -9660,8 +9725,8 @@ async function desactiverWakeLock() {
     }
 }
 
-const NOTIF_TIMER_ID = 1001;
-const NOTIF_BREAK_ID = 1002;
+const NOTIF_TIMER_ID = 1000;
+const NOTIF_BREAK_ID = 1000;
 
 async function initNotifications() {
     if (window.Capacitor && Capacitor.isNativePlatform()) {
@@ -9689,99 +9754,40 @@ async function initNotifications() {
 }
 
 async function programmerNotificationTimer(titre, message, dateFin) {
-    await annulerNotificationTimer();
     if (!dateFin || dateFin.getTime() <= Date.now()) return;
-
-    if (window.Capacitor && Capacitor.isNativePlatform()) {
-        try {
-            const { LocalNotifications } = Capacitor.Plugins;
-            await LocalNotifications.schedule({
-                notifications: [
-                    {
-                        title: titre || t('practice.timer_done_title'),
-                        body: message || t('practice.time_up_body'),
-                        id: NOTIF_TIMER_ID,
-                        schedule: { at: dateFin, allowWhileIdle: true },
-                        channelId: 'timer_alerts'
-                    }
-                ]
-            });
-        } catch (e) {
-            console.warn("Erreur programmation LocalNotification timer :", e);
-        }
-    } else if ('Notification' in window && Notification.permission === 'granted') {
-        const delayMs = dateFin.getTime() - Date.now();
-        if (delayMs > 0) {
-            window._webNotifTimer = setTimeout(() => {
-                try {
-                    new Notification(titre || t('practice.timer_done_title'), {
-                        body: message || t('practice.time_up_short')
-                    });
-                } catch (e) { }
-            }, delayMs);
-        }
-    }
+    const host = getSystemHost();
+    await host.armTimerNotification({
+        title: titre || t('practice.timer_done_title'),
+        body: message || t('practice.time_up_body'),
+        at: dateFin
+    });
 }
 
 async function annulerNotificationTimer() {
-    if (window._webNotifTimer) {
-        clearTimeout(window._webNotifTimer);
-        window._webNotifTimer = null;
-    }
-    if (window.Capacitor && Capacitor.isNativePlatform()) {
-        try {
-            const { LocalNotifications } = Capacitor.Plugins;
-            await LocalNotifications.cancel({ notifications: [{ id: NOTIF_TIMER_ID }] });
-        } catch (e) { }
-    }
+    const host = getSystemHost();
+    await host.disarmTimerNotification();
 }
 
 async function programmerNotificationPause(dateFin) {
-    await annulerNotificationPause();
     if (!dateFin || dateFin.getTime() <= Date.now()) return;
-
-    if (window.Capacitor && Capacitor.isNativePlatform()) {
-        try {
-            const { LocalNotifications } = Capacitor.Plugins;
-            await LocalNotifications.schedule({
-                notifications: [
-                    {
-                        title: t('practice.break_done_title'),
-                        body: t('practice.break_done_body'),
-                        id: NOTIF_BREAK_ID,
-                        schedule: { at: dateFin, allowWhileIdle: true },
-                        channelId: 'timer_alerts'
-                    }
-                ]
-            });
-        } catch (e) { }
-    } else if ('Notification' in window && Notification.permission === 'granted') {
-        const delayMs = dateFin.getTime() - Date.now();
-        if (delayMs > 0) {
-            window._webNotifBreak = setTimeout(() => {
-                try {
-                    new Notification(t('practice.break_done_title'), { body: t('practice.break_done_body') });
-                } catch (e) { }
-            }, delayMs);
-        }
-    }
+    const host = getSystemHost();
+    await host.armTimerNotification({
+        title: t('practice.break_done_title'),
+        body: t('practice.break_done_body'),
+        at: dateFin
+    });
 }
 
 async function annulerNotificationPause() {
-    if (window._webNotifBreak) {
-        clearTimeout(window._webNotifBreak);
-        window._webNotifBreak = null;
-    }
-    if (window.Capacitor && Capacitor.isNativePlatform()) {
-        try {
-            const { LocalNotifications } = Capacitor.Plugins;
-            await LocalNotifications.cancel({ notifications: [{ id: NOTIF_BREAK_ID }] });
-        } catch (e) { }
-    }
+    const host = getSystemHost();
+    await host.disarmTimerNotification();
 }
 
 function initBackgroundTimers() {
     document.addEventListener('visibilitychange', async () => {
+        if (typeof getSystemHost === 'function') {
+            await getSystemHost().handleVisibilityChange(document.visibilityState);
+        }
         if (document.visibilityState === 'visible') {
             if (activeTimer.index !== null && !activeTimer.isPaused) {
                 demarrerBoucleChrono();
@@ -9794,7 +9800,10 @@ function initBackgroundTimers() {
 
     if (window.Capacitor && Capacitor.isNativePlatform()) {
         const { App } = Capacitor.Plugins;
-        App.addListener('appStateChange', ({ isActive }) => {
+        App.addListener('appStateChange', async ({ isActive }) => {
+            if (typeof getSystemHost === 'function') {
+                await getSystemHost().handleVisibilityChange(isActive ? 'visible' : 'hidden');
+            }
             if (isActive) {
                 if (activeTimer.index !== null && !activeTimer.isPaused) {
                     demarrerBoucleChrono();
@@ -9844,6 +9853,7 @@ function ouvrirModalSettings(ongletParDefaut = 'categories') {
         const volPct = Math.round((audio.volume !== undefined ? audio.volume : 0.8) * 100);
         if (inputVol) inputVol.value = volPct;
         if (labelVol) labelVol.textContent = `${volPct}%`;
+        majToggleNotificationsUI();
     } catch (e) {
         console.warn("Erreur chargement config Audio :", e);
     }
@@ -10289,9 +10299,9 @@ function mettreAJourVolumeAudio(val) {
 // --- SYSTÈME DE SAUVEGARDE & RESTAURATION ---
 // ==========================================
 
-async function telechargerBlob(blob, nomFichier) {
-    // 1. Sur Android (Capacitor natif) : écriture dans CACHE puis partage système via @capacitor/share
-    if (window.Capacitor && Capacitor.isNativePlatform()) {
+async function telechargerFichierSysteme(blob, nomFichier, mime) {
+    // 1. Android SAF (Intent.ACTION_CREATE_DOCUMENT via NativeSystemBridge)
+    if (window.Capacitor && Capacitor.isNativePlatform() && window.NativeSystemBridge && typeof window.NativeSystemBridge.saveToDocument === 'function') {
         try {
             const base64Data = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -10306,51 +10316,48 @@ async function telechargerBlob(blob, nomFichier) {
             });
 
             const Filesystem = Capacitor.Plugins.Filesystem;
-            // On écrit dans 'CACHE' : aucune permission requise sur Android (API 21 à 35)
             await Filesystem.writeFile({
                 path: nomFichier,
                 data: base64Data,
                 directory: 'CACHE'
             });
 
-            const stat = await Filesystem.getUri({
-                path: nomFichier,
-                directory: 'CACHE'
+            return new Promise((resolve) => {
+                window.onNativeSaveResult = (success) => {
+                    window.onNativeSaveResult = null;
+                    try { Filesystem.deleteFile({ path: nomFichier, directory: 'CACHE' }); } catch (e) { }
+                    resolve(success === true || success === 'true');
+                };
+                window.NativeSystemBridge.saveToDocument(nomFichier, nomFichier, mime || blob.type || 'application/octet-stream');
             });
-
-            if (Capacitor.Plugins.Share) {
-                await Capacitor.Plugins.Share.share({
-                    title: nomFichier,
-                    text: t('settings.backup_share_text', { file: nomFichier }),
-                    url: stat.uri,
-                    dialogTitle: t('settings.backup_share_dialog')
-                });
-                return;
-            }
-        } catch (nativeErr) {
-            console.warn("Échec du partage natif Capacitor, tentative de secours :", nativeErr);
+        } catch (e) {
+            console.warn("Échec sauvegarde SAF Android :", e);
         }
     }
 
-    // 2. Sur navigateur Web ou WebView supportant Web Share API avec fichiers
-    if (navigator.canShare && window.File) {
+    // 2. PC / Navigateurs modernes (File System Access API: showSaveFilePicker)
+    if (typeof window.showSaveFilePicker === 'function') {
         try {
-            const file = new File([blob], nomFichier, { type: blob.type || 'application/octet-stream' });
-            if (navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: nomFichier,
-                    text: t('settings.backup_share_text', { file: nomFichier })
-                });
-                return;
-            }
-        } catch (shareErr) {
-            if (shareErr.name === 'AbortError') return;
-            console.warn("navigator.share a échoué, repli vers téléchargement navigateur :", shareErr);
+            const ext = nomFichier.split('.').pop().toLowerCase();
+            const mimeType = mime || (ext === 'zip' ? 'application/zip' : 'application/json');
+            const handle = await window.showSaveFilePicker({
+                suggestedName: nomFichier,
+                types: [{
+                    description: ext === 'zip' ? 'Archive ZIP' : 'Fichier JSON',
+                    accept: { [mimeType]: [`.${ext}`] }
+                }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return true;
+        } catch (pickerErr) {
+            if (pickerErr.name === 'AbortError') return false;
+            console.warn("showSaveFilePicker a échoué, repli téléchargement classique :", pickerErr);
         }
     }
 
-    // 3. Téléchargement Web classique (<a download>)
+    // 3. Repli : Téléchargement Web classique (<a download>)
     try {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -10363,10 +10370,16 @@ async function telechargerBlob(blob, nomFichier) {
             if (a.parentNode) document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 60000);
+        return true;
     } catch (e) {
-        console.error("Erreur de téléchargement :", e);
+        console.error("Erreur téléchargement repli :", e);
         alert(t('settings.download_error', { error: e.message }));
+        return false;
     }
+}
+
+async function telechargerBlob(blob, nomFichier) {
+    return telechargerFichierSysteme(blob, nomFichier);
 }
 
 async function exporterBackupJson() {
@@ -10377,26 +10390,26 @@ async function exporterBackupJson() {
     if (msg) { msg.style.display = 'block'; msg.textContent = t('settings.generating_json'); }
 
     try {
-        const backup = {
-            version: "piano-workout-backup-v1",
-            date_export: new Date().toISOString(),
-            seances: await lireLocal('seances'),
-            vocabulaire: await lireLocal('vocabulaire'),
-            routines: await lireLocal('routines'),
-            annotations: await lireLocal('annotations'),
+        const repo = getStorageRepo();
+        const backup = await repo.buildBackup({
             categories: chargerCategoriesConfig(),
             pomodoro: chargerPomodoroConfig(),
             audio: chargerAudioConfig()
-        };
+        });
 
         const jsonStr = JSON.stringify(backup, null, 2);
         const blob = new Blob([jsonStr], { type: 'application/json' });
         const dateStr = new Date().toISOString().split('T')[0];
-        await telechargerBlob(blob, `piano_workout_backup_${dateStr}.json`);
+        const nomFichier = `piano_workout_backup_${dateStr}.json`;
+        const res = await getSystemHost().saveBackupFile(nomFichier, blob, 'application/json');
 
         if (msg) {
-            msg.textContent = t('settings.json_downloaded');
-            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            if (res !== false) {
+                msg.textContent = t('settings.json_downloaded');
+                setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            } else {
+                msg.style.display = 'none';
+            }
         }
     } catch (err) {
         console.error("Erreur export JSON :", err);
@@ -10415,63 +10428,25 @@ async function exporterBackupCompletZip() {
     if (msg) { msg.style.display = 'block'; msg.textContent = t('settings.reading_db'); }
 
     try {
-        const zip = new JSZip();
-        const backup = {
-            version: "piano-workout-backup-v1",
-            date_export: new Date().toISOString(),
-            seances: await lireLocal('seances'),
-            vocabulaire: await lireLocal('vocabulaire'),
-            routines: await lireLocal('routines'),
-            annotations: await lireLocal('annotations'),
+        const repo = getStorageRepo();
+        const backup = await repo.buildBackup({
             categories: chargerCategoriesConfig(),
             pomodoro: chargerPomodoroConfig(),
             audio: chargerAudioConfig()
-        };
+        });
 
+        const zip = new JSZip();
         zip.file("database.json", JSON.stringify(backup, null, 2));
         const dossierFichiers = zip.folder("fichiers");
 
-        let fileNamesSet = new Set();
-        (backup.vocabulaire || []).forEach(item => {
-            if (item.fichier_image) {
-                if (Array.isArray(item.fichier_image)) {
-                    item.fichier_image.forEach(f => { if (f) fileNamesSet.add(f); });
-                } else if (typeof item.fichier_image === 'string') {
-                    fileNamesSet.add(item.fichier_image);
-                }
-            }
-            if (item.fichier_audio && typeof item.fichier_audio === 'string') {
-                fileNamesSet.add(item.fichier_audio);
-            }
-        });
-
-        const imagesWeb = await lireLocal('images');
-        if (Array.isArray(imagesWeb)) {
-            imagesWeb.forEach(img => { if (img && img.id) fileNamesSet.add(img.id); });
-        }
-
+        const media = await repo.collectMedia(backup);
         let count = 0;
-        const total = fileNamesSet.size;
+        const total = Object.keys(media).length;
 
-        for (const fileName of fileNamesSet) {
+        for (const [nomFichier, b64] of Object.entries(media)) {
             count++;
             if (msg) msg.textContent = t('settings.packing_files', { count: count, total: total });
-            try {
-                if (window.Capacitor && Capacitor.isNativePlatform()) {
-                    const fileData = await Capacitor.Plugins.Filesystem.readFile({ path: fileName, directory: 'DATA' });
-                    if (fileData && fileData.data) {
-                        dossierFichiers.file(fileName, fileData.data, { base64: true });
-                    }
-                } else {
-                    const cachedImg = await lireLocalId('images', fileName);
-                    if (cachedImg && cachedImg.base64) {
-                        const cleanB64 = cachedImg.base64.split(',')[1] || cachedImg.base64;
-                        dossierFichiers.file(fileName, cleanB64, { base64: true });
-                    }
-                }
-            } catch (err) {
-                console.warn("Fichier omis dans le ZIP (non trouvé) :", fileName);
-            }
+            dossierFichiers.file(nomFichier, b64, { base64: true });
         }
 
         if (msg) msg.textContent = t('settings.compressing_zip');
@@ -10480,11 +10455,16 @@ async function exporterBackupCompletZip() {
         });
 
         const dateStr = new Date().toISOString().split('T')[0];
-        await telechargerBlob(zipBlob, `piano_workout_backup_complet_${dateStr}.zip`);
+        const nomFichier = `piano_workout_backup_complet_${dateStr}.zip`;
+        const res = await getSystemHost().saveBackupFile(nomFichier, zipBlob, 'application/zip');
 
         if (msg) {
-            msg.textContent = t('settings.zip_exported', { total: total });
-            setTimeout(() => { msg.style.display = 'none'; }, 4000);
+            if (res !== false) {
+                msg.textContent = t('settings.zip_exported', { total: total });
+                setTimeout(() => { msg.style.display = 'none'; }, 4000);
+            } else {
+                msg.style.display = 'none';
+            }
         }
     } catch (err) {
         console.error("Erreur export ZIP :", err);
@@ -10504,6 +10484,7 @@ async function importerFichierBackup(event) {
     if (msg) { msg.style.display = 'block'; msg.textContent = t('settings.analyzing_backup'); }
 
     try {
+        const repo = getStorageRepo();
         const nom = (file.name || '').toLowerCase();
         const isZipMime = ['application/zip', 'application/x-zip-compressed', 'application/x-zip'].includes(file.type);
         const isJsonMime = file.type === 'application/json';
@@ -10511,11 +10492,15 @@ async function importerFichierBackup(event) {
         if (nom.endsWith('.json') || (isJsonMime && !nom.endsWith('.zip'))) {
             const contenu = await file.text();
             const data = JSON.parse(contenu);
-            await restaurerDonneesDatabase(data);
+            const bilan = await repo.restoreBackup(data);
+            if (data.categories) sauvegarderCategoriesConfig(data.categories);
+            if (data.pomodoro) sauvegarderParametresPomodoroDirect(data.pomodoro);
+            if (data.audio) sauvegarderParametresAudioDirect(data.audio);
+            await rafraichirApresRestauration();
             alert(t('settings.restore_json_done', {
-                vocab: (data.vocabulaire || []).length,
-                seances: (data.seances || []).length,
-                routines: (data.routines || []).length
+                vocab: bilan.itemsRestaures,
+                seances: bilan.seancesRestaurees,
+                routines: bilan.routinesRestaurees
             }));
         } else if (nom.endsWith('.zip') || isZipMime) {
             const zip = await JSZip.loadAsync(file);
@@ -10534,9 +10519,8 @@ async function importerFichierBackup(event) {
             if (msg) msg.textContent = t('settings.restoring_db');
             const jsonText = await dbFile.async("text");
             const data = JSON.parse(jsonText);
-            await restaurerDonneesDatabase(data);
 
-            let fichiersRestaures = 0;
+            const media = {};
             const entries = Object.keys(zip.files).filter(k => !zip.files[k].dir && !k.endsWith('.json'));
 
             for (let i = 0; i < entries.length; i++) {
@@ -10544,28 +10528,22 @@ async function importerFichierBackup(event) {
                 if (msg) msg.textContent = t('settings.restoring_files', { current: i + 1, total: entries.length });
                 const entry = zip.files[k];
                 const fileName = entry.name.split('/').pop();
-                const ext = fileName.split('.').pop().toLowerCase();
-                if (['png', 'jpg', 'jpeg', 'pdf', 'mp3', 'wav', 'm4a', 'webm', 'ogg', 'aac'].includes(ext)) {
-                    const base64 = await entry.async("base64");
-                    let mime = 'application/octet-stream';
-                    if (ext === 'pdf') mime = 'application/pdf';
-                    else if (['jpg', 'jpeg'].includes(ext)) mime = 'image/jpeg';
-                    else if (ext === 'png') mime = 'image/png';
-                    else if (ext === 'mp3') mime = 'audio/mpeg';
-                    else if (ext === 'wav') mime = 'audio/wav';
-                    else if (ext === 'webm') mime = 'audio/webm';
-                    else if (ext === 'ogg') mime = 'audio/ogg';
-                    else if (['m4a', 'aac'].includes(ext)) mime = 'audio/mp4';
-                    await sauvegarderFichierLocal(fileName, `data:${mime};base64,${base64}`);
-                    fichiersRestaures++;
+                if (fileName) {
+                    media[fileName] = await entry.async("base64");
                 }
             }
 
+            const bilan = await repo.restoreBackup(data, media);
+            if (data.categories) sauvegarderCategoriesConfig(data.categories);
+            if (data.pomodoro) sauvegarderParametresPomodoroDirect(data.pomodoro);
+            if (data.audio) sauvegarderParametresAudioDirect(data.audio);
+            await rafraichirApresRestauration();
+
             alert(t('settings.restore_zip_done', {
-                vocab: (data.vocabulaire || []).length,
-                seances: (data.seances || []).length,
-                routines: (data.routines || []).length,
-                files: fichiersRestaures
+                vocab: bilan.itemsRestaures,
+                seances: bilan.seancesRestaurees,
+                routines: bilan.routinesRestaurees,
+                files: bilan.mediasRestaures
             }));
         } else {
             alert(t('settings.unrecognized_backup'));
@@ -10584,70 +10562,21 @@ async function importerFichierBackup(event) {
     }
 }
 
-async function restaurerDonneesDatabase(data) {
-    if (!data) return;
-
-    if (Array.isArray(data.vocabulaire)) {
-        const existants = await lireLocal('vocabulaire');
-        const existantsMap = new Map();
-        existants.forEach(i => {
-            if (i.id) existantsMap.set(i.id, i);
-            if (i.titre) existantsMap.set(i.titre.toLowerCase().trim(), i);
-        });
-
-        for (const item of data.vocabulaire) {
-            const keyTitre = (item.titre || "").toLowerCase().trim();
-            const match = existantsMap.get(item.id) || existantsMap.get(keyTitre);
-            if (match) {
-                let scFusion = Array.isArray(match.sous_categories) ? [...match.sous_categories] : [];
-                if (Array.isArray(item.sous_categories)) {
-                    item.sous_categories.forEach(sc => { if (!scFusion.includes(sc)) scFusion.push(sc); });
-                }
-                const misAJour = { ...match, ...item, sous_categories: scFusion };
-                await ecrireLocal('vocabulaire', misAJour);
-            } else {
-                await ecrireLocal('vocabulaire', item);
-            }
-        }
-    }
-
-    if (Array.isArray(data.routines)) {
-        for (const r of data.routines) {
-            await ecrireLocal('routines', r);
-        }
-    }
-
-    if (Array.isArray(data.seances)) {
-        for (const s of data.seances) {
-            await ecrireLocal('seances', s);
-        }
-    }
-
-    if (Array.isArray(data.annotations)) {
-        for (const a of data.annotations) {
-            await ecrireLocal('annotations', a);
-        }
-    }
-
-    if (data.categories) {
-        sauvegarderCategoriesConfig(data.categories);
-    }
-
-    if (data.pomodoro) {
-        sauvegarderParametresPomodoroDirect(data.pomodoro);
-    }
-
-    if (data.audio) {
-        sauvegarderParametresAudioDirect(data.audio);
-    }
-
+async function rafraichirApresRestauration() {
     try { await chargerVocabulaireApi(); } catch (e) { }
     try { await chargerRoutinesApi(); } catch (e) { }
     try { await chargerHistorique(); } catch (e) { }
     try { await chargerDerniereSeance(); } catch (e) { }
 }
-
 if (typeof window !== 'undefined') {
+    window.toggleNotificationsSysteme = toggleNotificationsSysteme;
+    window.majToggleNotificationsUI = majToggleNotificationsUI;
+    window.sontNotificationsActivees = sontNotificationsActivees;
+    window.ouvrirModalMicPermission = ouvrirModalMicPermission;
+    window.fermerModalMicPermission = fermerModalMicPermission;
+    window.ouvrirParametresAndroidApp = ouvrirParametresAndroidApp;
+    window.getSystemHost = getSystemHost;
+    window.getStorageRepo = getStorageRepo;
     window.estTonaliteCreationAffichee = estTonaliteCreationAffichee;
     window.toggleMasquerTonaliteCreation = toggleMasquerTonaliteCreation;
     window.majAffichageTonaliteCreationUI = majAffichageTonaliteCreationUI;

@@ -10,9 +10,9 @@
       "enabled": true
     },
     "SplashScreen": {
-      "launchShowDuration": 800,
+      "launchShowDuration": 1000,
       "launchAutoHide": true,
-      "backgroundColor": "#0a0c10",
+      "backgroundColor": "#110d0a",
       "androidScaleType": "CENTER",
       "showSpinner": false,
       "splashFullScreen": true,
