@@ -1498,7 +1498,7 @@ body.mode-pupitre .item-card { display: none !important; }
     display: inline-block;
     min-width: 1ch;
     text-align: center;
-    margin: 0 1px;
+    margin: 0;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
 }
