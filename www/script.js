@@ -3136,22 +3136,52 @@ async function gererClicCarte(index) {
 // --- CHRONOMÈTRES ET POMODORO           ---
 // ==========================================
 
+function reinitialiserPomodoro() {
+    if (globalTimerData.interval) {
+        clearInterval(globalTimerData.interval);
+        globalTimerData.interval = null;
+    }
+    if (breakTimerData.interval) {
+        clearInterval(breakTimerData.interval);
+        breakTimerData.interval = null;
+    }
+    globalTimerData.isRunning = false;
+    globalTimerData.isBreakPending = false;
+    globalTimerData.endTime = null;
+    globalTimerData.remaining = getPomodoroWorkSec();
+    breakTimerData.endTime = null;
+
+    const btn = document.getElementById('btn-pause-cafe');
+    if (btn) {
+        btn.style.setProperty('display', 'none', 'important');
+        btn.classList.add('hidden');
+        btn.classList.remove('btn-fade-out');
+        btn.className = 'btn-action btn-ghost-blue btn-square hidden';
+    }
+    const txt = document.getElementById('texte-pause-cafe');
+    if (txt) {
+        txt.style.display = 'none';
+        txt.textContent = '';
+    }
+    annulerNotificationPause();
+}
+
 function startGlobalTimer() {
     if (globalTimerData.isRunning) return;
     if (activeTimer.index === null || activeTimer.isPaused) return;
+    if (breakTimerData.interval !== null) return;
+    if (globalTimerData.remaining <= 0) {
+        globalTimerData.remaining = getPomodoroWorkSec();
+    }
     globalTimerData.isRunning = true;
     globalTimerData.endTime = Date.now() + (globalTimerData.remaining * 1000);
+    if (globalTimerData.interval) clearInterval(globalTimerData.interval);
     globalTimerData.interval = setInterval(checkGlobalTimer, 1000);
 }
 
 function checkGlobalTimer() {
     if (!seanceEnCours || seanceEnCours.statut !== 'en_cours') {
-        if (globalTimerData.interval) clearInterval(globalTimerData.interval);
-        globalTimerData.interval = null;
-        globalTimerData.isRunning = false;
-        globalTimerData.isBreakPending = false;
-        const btn = document.getElementById('btn-pause-cafe');
-        if (btn) btn.style.display = 'none';
+        reinitialiserPomodoro();
         return;
     }
     let left = Math.ceil((globalTimerData.endTime - Date.now()) / 1000);
@@ -3165,7 +3195,14 @@ function checkGlobalTimer() {
 }
 
 function pauseGlobalTimer() {
-    if (globalTimerData.isRunning) { clearInterval(globalTimerData.interval); globalTimerData.isRunning = false; }
+    if (globalTimerData.isRunning) {
+        clearInterval(globalTimerData.interval);
+        globalTimerData.interval = null;
+        globalTimerData.isRunning = false;
+        if (globalTimerData.endTime) {
+            globalTimerData.remaining = Math.max(0, Math.ceil((globalTimerData.endTime - Date.now()) / 1000));
+        }
+    }
 }
 
 function showBreakButton() {
@@ -3174,16 +3211,18 @@ function showBreakButton() {
     if (!vuePratique || !vuePratique.classList.contains('vue-active')) return;
     const btn = document.getElementById('btn-pause-cafe'); const txt = document.getElementById('texte-pause-cafe');
     if (!btn) return;
-    btn.style.display = 'inline-flex'; btn.classList.remove('btn-fade-out');
+    btn.style.setProperty('display', 'inline-flex', 'important');
+    btn.classList.remove('hidden', 'btn-fade-out');
     btn.className = 'btn-action btn-ghost-blue btn-square'; btn.title = t('practice.break_prompt');
-    txt.style.display = 'none'; jouerSonApparitionPause();
+    if (txt) txt.style.display = 'none';
+    jouerSonApparitionPause();
 }
 
 function demarrerPauseCafe() {
     const btn = document.getElementById('btn-pause-cafe'); const txt = document.getElementById('texte-pause-cafe');
     resetDerniereInteraction();
     if (breakTimerData.interval !== null) {
-        clearInterval(breakTimerData.interval); breakTimerData.interval = null; terminerPauseCafe(true); return;
+        terminerPauseCafe(true); return;
     }
     if (activeTimer.index !== null && !activeTimer.isPaused) {
         togglePause();
@@ -3191,24 +3230,54 @@ function demarrerPauseCafe() {
         seanceEnCours.pause_active_debut = Date.now();
         sauvegarderEtatSeance();
     }
-    btn.className = 'btn-action btn-ghost-yellow'; btn.title = t('practice.cancel_break'); txt.style.display = 'inline-block';
+    if (btn) {
+        btn.style.setProperty('display', 'inline-flex', 'important');
+        btn.classList.remove('hidden');
+        btn.className = 'btn-action btn-ghost-yellow';
+        btn.title = t('practice.cancel_break');
+    }
+    if (txt) txt.style.display = 'inline-block';
     breakTimerData.endTime = Date.now() + (getPomodoroBreakSec() * 1000);
     programmerNotificationPause(new Date(breakTimerData.endTime));
+    if (breakTimerData.interval) clearInterval(breakTimerData.interval);
     breakTimerData.interval = setInterval(updateBreakTimer, 1000); updateBreakTimer();
 }
 
 function updateBreakTimer() {
     if (!breakTimerData.interval) return;
     let left = Math.ceil((breakTimerData.endTime - Date.now()) / 1000);
-    if (left <= 0) { clearInterval(breakTimerData.interval); breakTimerData.interval = null; terminerPauseCafe(false); return; }
+    if (left <= 0) { terminerPauseCafe(false); return; }
     const txt = document.getElementById('texte-pause-cafe'); if (txt) txt.textContent = formaterTemps(left);
 }
 
 function terminerPauseCafe(estAnnulee = false) {
     if (!estAnnulee) jouerSonFinPause();
     annulerNotificationPause();
-    const btn = document.getElementById('btn-pause-cafe'); btn.classList.add('btn-fade-out');
-    setTimeout(() => { btn.style.display = 'none'; globalTimerData.isBreakPending = false; globalTimerData.remaining = getPomodoroWorkSec(); }, 500);
+    if (breakTimerData.interval) {
+        clearInterval(breakTimerData.interval);
+        breakTimerData.interval = null;
+    }
+    breakTimerData.endTime = null;
+    globalTimerData.isBreakPending = false;
+    globalTimerData.remaining = getPomodoroWorkSec();
+    globalTimerData.isRunning = false;
+    globalTimerData.endTime = null;
+
+    const btn = document.getElementById('btn-pause-cafe');
+    const txt = document.getElementById('texte-pause-cafe');
+    if (txt) {
+        txt.style.display = 'none';
+        txt.textContent = '';
+    }
+    if (btn) {
+        btn.classList.add('btn-fade-out');
+        setTimeout(() => {
+            btn.style.setProperty('display', 'none', 'important');
+            btn.classList.add('hidden');
+            btn.classList.remove('btn-fade-out');
+            btn.className = 'btn-action btn-ghost-blue btn-square hidden';
+        }, 300);
+    }
     if (seanceEnCours && seanceEnCours.pause_active_debut && activeTimer.index === null) {
         seanceEnCours.temps_pause_cumule_ms = (seanceEnCours.temps_pause_cumule_ms || 0) + (Date.now() - seanceEnCours.pause_active_debut);
         seanceEnCours.pause_active_debut = null;
@@ -3426,9 +3495,7 @@ function terminerEtReinitialiser(statut) {
     annulerNotificationTimer();
     annulerNotificationPause();
     desactiverWakeLock();
-    if (globalTimerData.interval) { clearInterval(globalTimerData.interval); globalTimerData.interval = null; }
-    globalTimerData.isRunning = false; globalTimerData.isBreakPending = false;
-    if (breakTimerData.interval) { clearInterval(breakTimerData.interval); breakTimerData.interval = null; }
+    reinitialiserPomodoro();
     if (activeTimer.interval) { clearInterval(activeTimer.interval); activeTimer.interval = null; }
     activeTimer.index = null; activeTimer.isPaused = true;
     const btnCafe = document.getElementById('btn-pause-cafe');
@@ -3702,6 +3769,7 @@ async function sauvegarderSeance() {
     try {
         const cree = await apiFetch(`/seances`, { method: 'POST', body: JSON.stringify(nouvelleSeance) });
         seanceEnCours = cree;
+        reinitialiserPomodoro();
         afficherSeancePratique();
         afficherVue('pratique');
     } catch (e) {
@@ -9247,6 +9315,9 @@ function sauvegarderParametresPomodoroDirect(config) {
     const workMin = Math.max(1, parseInt(config.workMinutes) || 50);
     const breakMin = Math.max(1, parseInt(config.breakMinutes) || 5);
     localStorage.setItem('piano_workout_pomodoro', JSON.stringify({ workMinutes: workMin, breakMinutes: breakMin }));
+    if (!globalTimerData.isRunning) {
+        globalTimerData.remaining = workMin * 60;
+    }
 }
 
 function sauvegarderParametresAudio() {

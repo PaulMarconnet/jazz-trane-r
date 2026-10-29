@@ -125,6 +125,30 @@ describe('session-timer — Seam 2 : Cumul des pauses, Pomodoro et Pause café',
         expect(timer.getState(t0 + 265 * 1000).coffeeBreak.isActive).toBe(false);
         expect(timer.getState(t0 + 265 * 1000).sessionDurationSec).toBe(205);
     });
+
+    it('réinitialise complètement le Pomodoro et la Pause café au démarrage d\'une nouvelle séance', () => {
+        const timer = SessionTimer.createTimerMachine({ workSec: 60, breakSec: 30 });
+        const t0 = 5000000;
+
+        // Séance 1 : L'exercice avance de 40s (reste 20s de Pomodoro)
+        timer.startSession({ id: 1 }, t0);
+        timer.startExercise(0, { plannedSeconds: 300 }, t0);
+        timer.tick(t0 + 40 * 1000);
+        expect(timer.getState(t0 + 40 * 1000).pomodoro.workRemainingSec).toBe(20);
+
+        // Fin de la Séance 1 et Démarrage de la Séance 2
+        const t1 = t0 + 100 * 1000;
+        timer.startSession({ id: 2 }, t1);
+        const stateNouvelleSeance = timer.getState(t1);
+        expect(stateNouvelleSeance.pomodoro.workRemainingSec).toBe(60); // Doit être reparti à 60s plein !
+        expect(stateNouvelleSeance.pomodoro.isRunning).toBe(false);
+        expect(stateNouvelleSeance.pomodoro.isBreakPending).toBe(false);
+
+        // Premier exercice de la séance 2 : démarre à 60s
+        timer.startExercise(0, { plannedSeconds: 300 }, t1);
+        timer.tick(t1 + 10 * 1000);
+        expect(timer.getState(t1 + 10 * 1000).pomodoro.workRemainingSec).toBe(50);
+    });
 });
 
 describe('session-timer — Seam 3 : Détection AFK à +60 min d\'overtime sans interaction', () => {

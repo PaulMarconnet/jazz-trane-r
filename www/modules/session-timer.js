@@ -157,11 +157,36 @@
             session.timestamp_debut = (meta && meta.timestamp_debut) ? meta.timestamp_debut : current;
             session.temps_pause_cumule_ms = (meta && Number(meta.temps_pause_cumule_ms)) || 0;
             session.pause_active_debut = (meta && meta.pause_active_debut) || null;
-            if (lastInteractionTime === null) lastInteractionTime = current;
+            lastInteractionTime = current;
+
+            // Réinitialisation stricte du Pomodoro pour la nouvelle séance
+            pomodoro.workRemainingSec = workSec;
+            pomodoro.isRunning = false;
+            pomodoro.isBreakPending = false;
+            pomodoro.endTime = null;
+
+            coffeeBreak.isActive = false;
+            coffeeBreak.endTime = null;
+            coffeeBreak.remainingSec = 0;
+        }
+
+        function resetPomodoro() {
+            pomodoro.workRemainingSec = workSec;
+            pomodoro.isRunning = false;
+            pomodoro.isBreakPending = false;
+            pomodoro.endTime = null;
+            coffeeBreak.isActive = false;
+            coffeeBreak.endTime = null;
+            coffeeBreak.remainingSec = 0;
         }
 
         function restoreSession(savedMeta, now) {
-            startSession(savedMeta, now);
+            const current = (now !== undefined && now !== null) ? now : Date.now();
+            session.id = savedMeta ? (savedMeta.id || null) : null;
+            session.timestamp_debut = (savedMeta && savedMeta.timestamp_debut) ? savedMeta.timestamp_debut : current;
+            session.temps_pause_cumule_ms = (savedMeta && Number(savedMeta.temps_pause_cumule_ms)) || 0;
+            session.pause_active_debut = (savedMeta && savedMeta.pause_active_debut) || null;
+            if (lastInteractionTime === null) lastInteractionTime = current;
         }
 
         function recordInteraction(now) {
@@ -518,6 +543,7 @@
         return {
             startSession,
             restoreSession,
+            resetPomodoro,
             startExercise,
             pauseExercise,
             resumeExercise,
