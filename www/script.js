@@ -5197,9 +5197,12 @@ async function toggleFavoriImmersif(id, event) {
 function rafraichirHorlogeImmersive() {
     const clockEl = document.getElementById('immersive-discreet-clock');
     if (clockEl) {
-        clockEl.textContent = (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formatClock24h === 'function')
+        const timeStr = (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formatClock24h === 'function')
             ? window.SessionTimer.formatClock24h()
             : (new Date().getHours().toString().padStart(2, '0') + ':' + new Date().getMinutes().toString().padStart(2, '0'));
+        clockEl.innerHTML = (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formatClockHtml === 'function')
+            ? window.SessionTimer.formatClockHtml(timeStr)
+            : timeStr;
     }
 }
 
@@ -5214,7 +5217,12 @@ function majAffichageChrono(index, secondesAffichees) {
         const timeText = document.getElementById('android-timer-time'); const circle = document.getElementById('android-timer-circle');
         const etaText = document.getElementById('android-timer-eta-text'); const btnPause = document.getElementById('btn-immersif-pause');
         rafraichirHorlogeImmersive();
-        if (timeText) timeText.textContent = tFormate;
+        if (timeText) {
+            const timeRaw = activeTimer.isOvertime ? `+ ${tFormate}` : tFormate;
+            timeText.innerHTML = (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formatTimeHtml === 'function')
+                ? window.SessionTimer.formatTimeHtml(timeRaw)
+                : timeRaw;
+        }
         if (etaText) etaText.textContent = activeTimer.isOvertime ? "--:--" : calculerETA(secondesAffichees);
         if (circle) {
             circle.className = 'android-timer-circle';
@@ -5267,10 +5275,15 @@ function renderShuffleCard() {
         if (activeTimer.isOvertime) { timerClass = 'overtime'; } else if (activeTimer.isPaused) { timerClass = 'paused'; } else { timerClass = 'running'; }
     }
 
+    const timeRaw = (activeTimer.index !== null && activeTimer.isOvertime) ? `+ ${timeStr}` : timeStr;
+    const timeDisplayHtml = (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formatTimeHtml === 'function')
+        ? window.SessionTimer.formatTimeHtml(timeRaw)
+        : timeRaw;
+
     timerContainer.innerHTML = `
         <div id="android-timer-circle" class="android-timer-circle ${timerClass}">
             <div class="android-timer-total">${originalMins} min</div>
-            <div id="android-timer-time" class="android-timer-time">${timeStr}</div>
+            <div id="android-timer-time" class="android-timer-time">${timeDisplayHtml}</div>
             <div class="android-timer-eta">
                 <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: currentColor; margin-right: 4px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                 <span id="android-timer-eta-text">${etaStr}</span>

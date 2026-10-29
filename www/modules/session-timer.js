@@ -34,6 +34,42 @@
         return `${hours}:${minutes}`;
     }
 
+    function formatTimeHtml(timeStr) {
+        if (!timeStr || typeof timeStr !== 'string') return '';
+        let prefix = '';
+        let clean = timeStr.trim();
+        if (clean.startsWith('+')) {
+            prefix = '<span class="timer-prefix">+</span>';
+            clean = clean.replace(/^\+\s*/, '');
+        }
+        const parts = clean.split(':');
+        if (parts.length === 2) {
+            const rawMin = parts[0].trim();
+            const min = rawMin.length === 1 ? ('0' + rawMin) : rawMin;
+            const sec = parts[1].trim().padStart(2, '0');
+            return `${prefix}<span class="timer-digits timer-min">${min}</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">${sec}</span>`;
+        }
+        return timeStr;
+    }
+
+    function formatClockHtml(clockStrOrDate) {
+        let clockStr = '';
+        if (clockStrOrDate instanceof Date || typeof clockStrOrDate === 'number') {
+            clockStr = formatClock24h(clockStrOrDate);
+        } else if (typeof clockStrOrDate === 'string') {
+            clockStr = clockStrOrDate.trim();
+        } else {
+            clockStr = formatClock24h();
+        }
+        const parts = clockStr.split(':');
+        if (parts.length === 2) {
+            const hours = parts[0].trim().padStart(2, '0');
+            const minutes = parts[1].trim().padStart(2, '0');
+            return `<span class="clock-digits clock-hours">${hours}</span><span class="clock-sep">:</span><span class="clock-digits clock-mins">${minutes}</span>`;
+        }
+        return clockStr;
+    }
+
     function calculateSessionRealDuration(seance, nowInput) {
         if (!seance) return 0;
         const now = (nowInput !== undefined && nowInput !== null) ? nowInput : Date.now();
@@ -503,6 +539,8 @@
         calculateSessionRealDuration,
         formaterTemps,
         formaterDureeSeance,
-        formatClock24h
+        formatClock24h,
+        formatTimeHtml,
+        formatClockHtml
     };
 }));

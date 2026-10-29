@@ -255,6 +255,24 @@ describe('session-timer — Seam 4 : Formule unique de durée réelle & Horloge 
         expect(SessionTimer.formaterDureeSeance(75)).toBe('01:15');
         expect(SessionTimer.formaterDureeSeance(3665)).toBe('1h01:05');
     });
+
+    it('génère un balisage HTML stable pour le chronomètre et l\'horloge discrète (zéro saut du séparateur)', () => {
+        // Chronomètre standard 2 chiffres
+        const htmlStd = SessionTimer.formatTimeHtml('05:00');
+        expect(htmlStd).toBe('<span class="timer-digits timer-min">05</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">00</span>');
+
+        // Chronomètre avec 1 chiffre de minute (normalisé à 2 chiffres pour éviter les sauts)
+        const htmlSingleMin = SessionTimer.formatTimeHtml('5:00');
+        expect(htmlSingleMin).toBe('<span class="timer-digits timer-min">05</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">00</span>');
+
+        // Chronomètre en overtime avec préfixe +
+        const htmlOvertime = SessionTimer.formatTimeHtml('+ 01:23');
+        expect(htmlOvertime).toBe('<span class="timer-prefix">+</span><span class="timer-digits timer-min">01</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">23</span>');
+
+        // Horloge discrète 24h
+        const htmlClock = SessionTimer.formatClockHtml('10:04');
+        expect(htmlClock).toBe('<span class="clock-digits clock-hours">10</span><span class="clock-sep">:</span><span class="clock-digits clock-mins">04</span>');
+    });
 });
 
 
