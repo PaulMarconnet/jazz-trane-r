@@ -44,6 +44,14 @@ _Éviter_ : modèle, template
 
 ## Organisation du travail (méthode de développement)
 
+**Série** :
+Le nombre de jours consécutifs où au moins une séance de pratique a été menée à son terme.
+_Éviter_ : streak, suite, flamme
+
+**Calendrier de pratique** :
+La grille mensuelle interactive visualisant les jours où des séances ont été réalisées et le volume d'assiduité.
+_Éviter_ : heatmap, agenda, tableau de bord des jours
+
 **Roadmap** :
 La vision globale et à long terme du produit : ce à quoi l'application répond, son contenu cible et ses grandes orientations.
 _Éviter_ : feuille de route (pour un patch), plan

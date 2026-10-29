@@ -174,9 +174,20 @@ const I18N_DICT = {
         "history.title": "Tableau de bord",
         "history.this_week": "Cette semaine",
         "history.this_week_title": "Voir l'évolution du temps passé",
-        "history.avg_completion": "Complétion moyenne",
+        "history.weekly_goal": "Objectif hebdomadaire",
+        "history.weekly_goal_title": "Définir un objectif hebdomadaire",
+        "history.set_goal_hint": "Cliquer pour fixer un objectif",
+        "history.no_goal_label": "Ne pas définir d'objectif",
         "history.current_streak": "Série actuelle",
+        "history.current_streak_title": "Voir la régularité et le record de série",
         "history.streak_unit": "{count} j",
+        "history.streak_modal_title": "Régularité & Séries",
+        "history.streak_current": "En cours",
+        "history.streak_record": "Record",
+        "history.streak_this_month": "Ce mois-ci",
+        "history.streak_practice_days": "{count} jour{s} de pratique",
+        "history.streak_no_practice": "Aucune pratique ce mois-ci",
+        "history.modal_close": "Fermer",
         "history.top_key": "Meilleure tonalité",
         "history.top_key_title": "Voir la répartition des tonalités",
         "history.recent_sessions": "Dernières séances",
@@ -782,9 +793,20 @@ const I18N_DICT = {
         "history.title": "Dashboard",
         "history.this_week": "This Week",
         "history.this_week_title": "View practice time trends",
-        "history.avg_completion": "Avg. Completion",
+        "history.weekly_goal": "Weekly Goal",
+        "history.weekly_goal_title": "Set a weekly practice goal",
+        "history.set_goal_hint": "Click to set a goal",
+        "history.no_goal_label": "No goal set",
         "history.current_streak": "Current Streak",
+        "history.current_streak_title": "View streak stats and record",
         "history.streak_unit": "{count} d",
+        "history.streak_modal_title": "Consistency & Streaks",
+        "history.streak_current": "Current",
+        "history.streak_record": "Record",
+        "history.streak_this_month": "This Month",
+        "history.streak_practice_days": "{count} practice day{s}",
+        "history.streak_no_practice": "No practice this month",
+        "history.modal_close": "Close",
         "history.top_key": "Top Key",
         "history.top_key_title": "View key center breakdown",
         "history.recent_sessions": "Recent Sessions",
@@ -1469,10 +1491,12 @@ function appliquerTraductionsDOM() {
         if (st) st.textContent = t('history.this_week');
     }
     if (statCards[1]) {
+        statCards[1].setAttribute('title', t('history.weekly_goal_title'));
         const st = statCards[1].querySelector('.stat-title');
-        if (st) st.textContent = t('history.avg_completion');
+        if (st) st.textContent = t('history.weekly_goal');
     }
     if (statCards[2]) {
+        statCards[2].setAttribute('title', t('history.current_streak_title'));
         const st = statCards[2].querySelector('.stat-title');
         if (st) st.textContent = t('history.current_streak');
     }
@@ -1487,6 +1511,13 @@ function appliquerTraductionsDOM() {
     setTxt('#limite-hist-20', 'history.last_20');
     setTxt('#limite-hist-50', 'history.last_50');
     setTxt('#limite-hist-toutes', 'history.all');
+
+    // Modale Régularité & Séries
+    setTxt('#streak-modal-title', 'history.streak_modal_title');
+    setTxt('#streak-label-current', 'history.streak_current');
+    setTxt('#streak-label-record', 'history.streak_record');
+    setTxt('#streak-label-month', 'history.streak_this_month');
+    setTxt('#streak-modal-btn-close', 'history.modal_close');
 
     // Modale Graphiques
     setTxt('#label-type-graph', 'graph.view_btn');

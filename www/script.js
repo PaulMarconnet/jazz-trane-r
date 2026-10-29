@@ -3858,8 +3858,16 @@ function initDragAndDrop() {
 // --- HISTORIQUE, STATS & GRAPHIQUES     ---
 // ==========================================
 let historiquesTerminees = []; let graphTypeActuel = ''; let graphPeriodeActuelle = 'semaine'; let monGraphique = null; let limiteHistorique = 10;
-function getMonday(d) { d = new Date(d); let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1); return new Date(d.setDate(diff)); }
+function getMonday(d) {
+    if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.getMonday === 'function') {
+        return window.HistoryAnalytics.getMonday(d);
+    }
+    d = new Date(d); let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1); return new Date(d.setDate(diff));
+}
 function getTonaliteMajeureRelative(tona) {
+    if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.getRelativeMajorKey === 'function') {
+        return window.HistoryAnalytics.getRelativeMajorKey(tona) || tona;
+    }
     if (!tona) return tona;
     const norm = tona.replace(/\bminor\b/gi, 'mineur').replace(/\bmajor\b/gi, 'majeur');
     if (!norm.includes('mineur')) return norm;
@@ -3873,50 +3881,83 @@ async function chargerHistorique() {
         historiquesTerminees = seances.filter(s => s.statut === 'terminee'); safeSortSeances(historiquesTerminees);
         const listeHist = document.getElementById('liste-historique-seances'); listeHist.innerHTML = "";
         if (historiquesTerminees.length === 0) {
-            listeHist.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted);">${t('history.empty')}</div>`;
-            document.getElementById('stat-temps-7j').textContent = "-- min"; document.getElementById('stat-completion').textContent = "-- %";
-            document.getElementById('stat-streak').querySelector('span').textContent = "--"; document.getElementById('stat-tonalite-reine').querySelector('span').textContent = "--";
+            listeHist.innerHTML = `
+                <div style="text-align: center; padding: 32px 20px; color: var(--text-muted);">
+                    <p style="margin: 0 0 16px 0; font-size: 14px;">${t('history.empty')}</p>
+                    <button class="btn-action btn-ghost-neutral" onclick="injecterSeancesDemo()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px;">
+                        <svg viewBox="0 0 24 24" style="width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                        Charger des séances d'exemple
+                    </button>
+                </div>`;
+            document.getElementById('stat-temps-7j').textContent = "-- min";
+            updateCardObjectifUI(null);
+            document.getElementById('stat-streak').querySelector('span').textContent = "--";
+            document.getElementById('stat-tonalite-reine').querySelector('span').textContent = "--";
             return;
         }
 
-        let tempsTotalSemaineMins = 0; let tonsCount = {}; let itemsFaits = 0; let itemsTotal = 0;
-        const lundiCetteSemaine = getMonday(new Date()); lundiCetteSemaine.setHours(0, 0, 0, 0);
-        let datesSet = new Set(historiquesTerminees.map(s => s.date_seance ? s.date_seance.split('T')[0] : null));
-        let streak = 0; let d = new Date(); let dateStr = d.toISOString().split('T')[0];
-        if (!datesSet.has(dateStr)) { d.setDate(d.getDate() - 1); dateStr = d.toISOString().split('T')[0]; }
-        while (datesSet.has(dateStr)) { streak++; d.setDate(d.getDate() - 1); dateStr = d.toISOString().split('T')[0]; }
-
         historiquesTerminees.forEach(s => {
-            if (s.tonalite_du_jour) { const tRelative = getTonaliteMajeureRelative(s.tonalite_du_jour); tonsCount[tRelative] = (tonsCount[tRelative] || 0) + 1; }
-            let tempsSeanceMins = 0;
-            if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.calculateSessionRealDuration === 'function') {
-                tempsSeanceMins = Math.round(window.SessionTimer.calculateSessionRealDuration(s) / 60);
+            if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.calculateSessionDurationMinutes === 'function') {
+                s.tempsTotalCalc = window.HistoryAnalytics.calculateSessionDurationMinutes(s);
+            } else if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.calculateSessionRealDuration === 'function') {
+                s.tempsTotalCalc = Math.round(window.SessionTimer.calculateSessionRealDuration(s) / 60);
             } else if (s.duree_reelle !== undefined && s.duree_reelle !== null && Number(s.duree_reelle) > 0) {
-                tempsSeanceMins = Math.round(Number(s.duree_reelle) / 60);
+                s.tempsTotalCalc = Math.round(Number(s.duree_reelle) / 60);
             } else if (s.items && Array.isArray(s.items)) {
+                let itemsMins = 0;
                 s.items.forEach(item => {
                     if (item.fait) {
                         const prevu = Number(item.temps_prevu || 0);
                         const restant = Number(item.temps_restant || 0);
                         const reelSecs = item.isOvertime ? (prevu * 60 + restant) : Math.max(0, prevu * 60 - restant);
-                        tempsSeanceMins += Math.round(reelSecs / 60) || prevu;
+                        itemsMins += Math.round(reelSecs / 60) || prevu;
                     }
                 });
+                s.tempsTotalCalc = itemsMins;
+            } else {
+                s.tempsTotalCalc = 0;
             }
-            s.tempsTotalCalc = tempsSeanceMins;
-            if (s.date_seance) { const dateSeance = new Date(s.date_seance); if (dateSeance >= lundiCetteSemaine) tempsTotalSemaineMins += tempsSeanceMins; }
-            if (s.items && Array.isArray(s.items)) { s.items.forEach(item => { itemsTotal++; if (item.fait) itemsFaits++; }); }
         });
 
         renderHistoriqueListe();
-        let completionRate = itemsTotal === 0 ? 0 : Math.round((itemsFaits / itemsTotal) * 100);
-        document.getElementById('stat-temps-7j').textContent = formatDureeHistorique(tempsTotalSemaineMins);
-        document.getElementById('stat-completion').textContent = completionRate + " %";
-        document.getElementById('stat-streak').querySelector('span').textContent = `${streak} ${t('history.days_unit')}`;
 
-        let reine = "--"; let maxCount = 0;
-        for (const [ton, count] of Object.entries(tonsCount)) { if (count > maxCount) { maxCount = count; reine = ton; } }
-        document.getElementById('stat-tonalite-reine').querySelector('span').textContent = formatTonalite(reine);
+        const rawGoal = localStorage.getItem('piano_workout_weekly_goal_hours');
+        const weeklyGoalHours = rawGoal ? parseInt(rawGoal, 10) : 0;
+
+        if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.calculateHistorySummary === 'function') {
+            const summary = window.HistoryAnalytics.calculateHistorySummary(historiquesTerminees, { weeklyGoalHours });
+            document.getElementById('stat-temps-7j').textContent = summary.weeklyDurationFormatted;
+            updateCardObjectifUI(summary.weeklyGoal);
+            document.getElementById('stat-streak').querySelector('span').textContent = `${summary.streakDays} ${t('history.days_unit')}`;
+            document.getElementById('stat-tonalite-reine').querySelector('span').textContent = formatTonalite(summary.reineTonalite || "--");
+        } else {
+            let tempsTotalSemaineMins = 0; let tonsCount = {}; let itemsFaits = 0; let itemsTotal = 0;
+            const lundiCetteSemaine = getMonday(new Date()); lundiCetteSemaine.setHours(0, 0, 0, 0);
+            let datesSet = new Set(historiquesTerminees.map(s => s.date_seance ? s.date_seance.split('T')[0] : null));
+            let streak = 0; let d = new Date(); let dateStr = d.toISOString().split('T')[0];
+            if (!datesSet.has(dateStr)) { d.setDate(d.getDate() - 1); dateStr = d.toISOString().split('T')[0]; }
+            while (datesSet.has(dateStr)) { streak++; d.setDate(d.getDate() - 1); dateStr = d.toISOString().split('T')[0]; }
+
+            historiquesTerminees.forEach(s => {
+                if (s.tonalite_du_jour) { const tRelative = getTonaliteMajeureRelative(s.tonalite_du_jour); tonsCount[tRelative] = (tonsCount[tRelative] || 0) + 1; }
+                const tempsSeanceMins = s.tempsTotalCalc || 0;
+                if (s.date_seance) { const dateSeance = new Date(s.date_seance); if (dateSeance >= lundiCetteSemaine) tempsTotalSemaineMins += tempsSeanceMins; }
+                if (s.items && Array.isArray(s.items)) { s.items.forEach(item => { itemsTotal++; if (item.fait) itemsFaits++; }); }
+            });
+
+            document.getElementById('stat-temps-7j').textContent = formatDureeHistorique(tempsTotalSemaineMins);
+            if (weeklyGoalHours > 0) {
+                const pct = Math.round((tempsTotalSemaineMins / (weeklyGoalHours * 60)) * 100);
+                updateCardObjectifUI({ hasGoal: true, formattedPercentage: `${pct} %`, isCompleted: pct >= 100, progressRatio: pct / 100 });
+            } else {
+                updateCardObjectifUI(null);
+            }
+            document.getElementById('stat-streak').querySelector('span').textContent = `${streak} ${t('history.days_unit')}`;
+
+            let reine = "--"; let maxCount = 0;
+            for (const [ton, count] of Object.entries(tonsCount)) { if (count > maxCount) { maxCount = count; reine = ton; } }
+            document.getElementById('stat-tonalite-reine').querySelector('span').textContent = formatTonalite(reine);
+        }
     } catch (err) { }
 }
 
@@ -3927,6 +3968,107 @@ async function supprimerSeance(id) {
 async function reinitialiserHistorique() {
     if (confirm(t('history.confirm_reset_all'))) { try { await apiFetch(`/seances/reset`, { method: 'DELETE' }); chargerHistorique(); } catch (e) { } }
 }
+
+async function injecterSeancesDemo() {
+    const now = new Date();
+    const demoSeances = [
+        // Aujourd'hui (J0) : 45 min, C mineur (relative Eb majeur)
+        {
+            id: Date.now() - 1000,
+            statut: 'terminee',
+            date_seance: new Date(now.getTime() - 2 * 3600 * 1000).toISOString(),
+            duree_reelle: 2700,
+            tonalite_du_jour: 'C mineur',
+            items: [
+                { fait: true, categorie: 'Morceaux', titre: 'Autumn Leaves', temps_prevu: 20, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1200 },
+                { fait: true, categorie: 'Voicings', titre: 'II-V-I Voicings Bud Powell', temps_prevu: 15, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 900 },
+                { fait: true, categorie: 'Technique', titre: 'Gammes Bebop majeures', temps_prevu: 10, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 600 }
+            ]
+        },
+        // Hier (J-1) : 60 min, Eb majeur
+        {
+            id: Date.now() - 2000,
+            statut: 'terminee',
+            date_seance: new Date(now.getTime() - 24 * 3600 * 1000).toISOString(),
+            duree_reelle: 3600,
+            tonalite_du_jour: 'Eb majeur',
+            items: [
+                { fait: true, categorie: 'Morceaux', titre: "Take the 'A' Train", temps_prevu: 25, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1500 },
+                { fait: true, categorie: 'Licks', titre: 'Charlie Parker Enclosures', temps_prevu: 15, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 900 },
+                { fait: true, categorie: 'Patterns', titre: 'Trane Digital Patterns 1-2-3-5', temps_prevu: 20, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1200 }
+            ]
+        },
+        // J-2 : 50 min, A mineur (relative C majeur)
+        {
+            id: Date.now() - 3000,
+            statut: 'terminee',
+            date_seance: new Date(now.getTime() - 48 * 3600 * 1000).toISOString(),
+            duree_reelle: 3000,
+            tonalite_du_jour: 'A mineur',
+            items: [
+                { fait: true, categorie: 'Relevés', titre: 'Solo Bill Evans sur So What', temps_prevu: 25, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1500 },
+                { fait: true, categorie: 'Morceaux', titre: 'Solar', temps_prevu: 15, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 900 },
+                { fait: true, categorie: 'Technique', titre: 'Arpèges brisés mains alternées', temps_prevu: 10, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 600 }
+            ]
+        },
+        // J-3 : 40 min, C majeur
+        {
+            id: Date.now() - 4000,
+            statut: 'terminee',
+            date_seance: new Date(now.getTime() - 72 * 3600 * 1000).toISOString(),
+            duree_reelle: 2400,
+            tonalite_du_jour: 'C majeur',
+            items: [
+                { fait: true, categorie: 'Voicings', titre: 'Drop 2 Quartaux', temps_prevu: 20, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1200 },
+                { fait: true, categorie: 'Morceaux', titre: 'All The Things You Are', temps_prevu: 20, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1200 }
+            ]
+        },
+        // J-4 : 60 min, Eb mineur (relative Gb majeur)
+        {
+            id: Date.now() - 5000,
+            statut: 'terminee',
+            date_seance: new Date(now.getTime() - 96 * 3600 * 1000).toISOString(),
+            duree_reelle: 3600,
+            tonalite_du_jour: 'Eb mineur',
+            items: [
+                { fait: true, categorie: 'Morceaux', titre: "'Round Midnight", temps_prevu: 30, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1800 },
+                { fait: true, categorie: 'Licks', titre: 'Turnarounds coltraniens', temps_prevu: 15, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 900 },
+                { fait: true, categorie: 'Voicings', titre: 'So What Chords', temps_prevu: 15, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 900 }
+            ]
+        },
+        // J-10 (il y a 10 jours) : 70 min, G mineur (relative Bb majeur)
+        {
+            id: Date.now() - 6000,
+            statut: 'terminee',
+            date_seance: new Date(now.getTime() - 10 * 24 * 3600 * 1000).toISOString(),
+            duree_reelle: 4200,
+            tonalite_du_jour: 'G mineur',
+            items: [
+                { fait: true, categorie: 'Morceaux', titre: 'Blue Bossa', temps_prevu: 30, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1800 },
+                { fait: true, categorie: 'Patterns', titre: 'Pentatoniques modernes', temps_prevu: 20, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1200 },
+                { fait: true, categorie: 'Technique', titre: 'Rythmique swing main gauche', temps_prevu: 20, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1200 }
+            ]
+        },
+        // J-20 (il y a 20 jours) : 60 min, F majeur
+        {
+            id: Date.now() - 7000,
+            statut: 'terminee',
+            date_seance: new Date(now.getTime() - 20 * 24 * 3600 * 1000).toISOString(),
+            duree_reelle: 3600,
+            tonalite_du_jour: 'F majeur',
+            items: [
+                { fait: true, categorie: 'Morceaux', titre: "Now's The Time", temps_prevu: 30, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1800 },
+                { fait: true, categorie: 'Relevés', titre: 'Thelonious Monk voicings', temps_prevu: 30, temps_restant: 0, isOvertime: false, duree_reelle_secondes: 1800 }
+            ]
+        }
+    ];
+
+    for (const s of demoSeances) {
+        await ecrireLocal('seances', s);
+    }
+    await chargerHistorique();
+}
+window.injecterSeancesDemo = injecterSeancesDemo;
 
 function fermerTousLesDropdowns() {
     document.querySelectorAll('.dropdown.show').forEach(d => d.classList.remove('show'));
@@ -4006,49 +4148,116 @@ function changerPeriodeGraph(periode) {
     if (btnPer) btnPer.classList.add('active');
     fermerTousLesDropdowns();
 
-    const now = new Date(); let startDate = new Date(0); let labelsData = []; let dataMap = {}; let totalMinutes = 0;
-
-    if (periode === 'semaine') { startDate = getMonday(now); startDate.setHours(0, 0, 0, 0); labelsData = [...t('history.days_week')]; labelsData.forEach(l => dataMap[l] = 0); }
-    else if (periode === 'mois') { startDate = new Date(now.getFullYear(), now.getMonth(), 1); labelsData = [...t('history.weeks_month')]; labelsData.forEach(l => dataMap[l] = 0); }
-    else if (periode === 'annee') { startDate = new Date(now.getFullYear(), 0, 1); labelsData = [...t('history.months_year')]; labelsData.forEach(l => dataMap[l] = 0); }
-
-    let statsCategories = {}; let statsTonalites = {};
-
-    historiquesTerminees.forEach(s => {
-        if (!s.date_seance) return;
-        const dateSeance = new Date(s.date_seance);
-        if (dateSeance >= startDate) {
-            let tempsSeanceMins = 0;
-            if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.calculateSessionRealDuration === 'function') {
-                tempsSeanceMins = Math.round(window.SessionTimer.calculateSessionRealDuration(s) / 60);
-            } else {
-                tempsSeanceMins = Math.round((s.duree_reelle || 0) / 60);
+    let chartData;
+    if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.calculatePeriodChartData === 'function') {
+        chartData = window.HistoryAnalytics.calculatePeriodChartData(historiquesTerminees, periode, {
+            i18n: {
+                days_week: t('history.days_week'),
+                weeks_month: t('history.weeks_month'),
+                months_year: t('history.months_year')
             }
-            totalMinutes += tempsSeanceMins;
-            if (s.items && Array.isArray(s.items)) {
-                s.items.forEach(item => {
-                    if (item.fait) {
-                        const prevuSecs = Number(item.temps_prevu || 0) * 60; const restantSecs = Number(item.temps_restant || 0);
-                        const reelSecs = item.isOvertime ? prevuSecs + restantSecs : prevuSecs - restantSecs;
-                        const tempsReelExerciceMins = Math.max(0, reelSecs / 60);
-                        statsCategories[item.categorie] = (statsCategories[item.categorie] || 0) + tempsReelExerciceMins;
-                    }
-                });
-            }
-
-            if (graphTypeActuel === 'temps') {
-                if (periode === 'semaine') { let d = dateSeance.getDay(); let idx = d === 0 ? 6 : d - 1; dataMap[labelsData[idx]] += tempsSeanceMins; }
-                else if (periode === 'mois') { let dateNum = dateSeance.getDate(); let weekIdx = Math.floor((dateNum - 1) / 7); if (weekIdx > 4) weekIdx = 4; dataMap[labelsData[weekIdx]] += tempsSeanceMins; }
-                else if (periode === 'annee') { let m = dateSeance.getMonth(); dataMap[labelsData[m]] += tempsSeanceMins; }
-                else { let yr = dateSeance.getFullYear().toString(); if (!labelsData.includes(yr)) { labelsData.push(yr); dataMap[yr] = 0; } dataMap[yr] += tempsSeanceMins; }
-            }
-
-            if (s.tonalite_du_jour) { const tRelative = getTonaliteMajeureRelative(s.tonalite_du_jour); statsTonalites[tRelative] = (statsTonalites[tRelative] || 0) + 1; }
+        });
+    } else {
+        const now = new Date();
+        let startDate = new Date(0);
+        let labels = [];
+        let dataMap = {};
+        if (periode === 'semaine') {
+            startDate = getMonday(now);
+            startDate.setHours(0, 0, 0, 0);
+            labels = [...t('history.days_week')];
+        } else if (periode === 'mois') {
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            labels = [...t('history.weeks_month')];
+        } else if (periode === 'annee') {
+            startDate = new Date(now.getFullYear(), 0, 1);
+            labels = [...t('history.months_year')];
+        } else {
+            labels = [];
         }
-    });
+        labels.forEach(l => { dataMap[l] = 0; });
 
-    let heuresFormattees = (totalMinutes / 60).toFixed(1); document.getElementById('total-temps-graph').innerText = t('history.total_hours', { hours: heuresFormattees });
-    if (monGraphique) monGraphique.destroy(); const ctx = document.getElementById('myChart').getContext('2d'); const titre = document.getElementById('titre-graph');
+        let totalMinutes = 0;
+        const categoriesMap = {};
+        const tonalitiesMap = {};
+
+        historiquesTerminees.forEach(s => {
+            if (!s.date_seance) return;
+            const dateSeance = new Date(s.date_seance);
+            if (dateSeance >= startDate) {
+                const sessionMins = s.tempsTotalCalc || Math.round((s.duree_reelle || 0) / 60);
+                totalMinutes += sessionMins;
+
+                if (Array.isArray(s.items)) {
+                    s.items.forEach(item => {
+                        if (item && item.fait && item.categorie) {
+                            const prevu = Number(item.temps_prevu || 0) * 60;
+                            const restant = Number(item.temps_restant || 0);
+                            const reelSecs = item.isOvertime ? (prevu + restant) : Math.max(0, prevu - restant);
+                            categoriesMap[item.categorie] = (categoriesMap[item.categorie] || 0) + Math.round(reelSecs / 60);
+                        }
+                    });
+                }
+
+                if (s.tonalite_du_jour) {
+                    const tRel = getTonaliteMajeureRelative(s.tonalite_du_jour);
+                    tonalitiesMap[tRel] = (tonalitiesMap[tRel] || 0) + 1;
+                }
+
+                if (periode === 'semaine') {
+                    const day = dateSeance.getDay();
+                    const idx = day === 0 ? 6 : day - 1;
+                    if (labels[idx]) dataMap[labels[idx]] += sessionMins;
+                } else if (periode === 'mois') {
+                    let weekIdx = Math.floor((dateSeance.getDate() - 1) / 7);
+                    if (weekIdx > 4) weekIdx = 4;
+                    if (labels[weekIdx]) dataMap[labels[weekIdx]] += sessionMins;
+                } else if (periode === 'annee') {
+                    if (labels[dateSeance.getMonth()]) dataMap[labels[dateSeance.getMonth()]] += sessionMins;
+                } else {
+                    const yr = dateSeance.getFullYear().toString();
+                    if (!labels.includes(yr)) { labels.push(yr); dataMap[yr] = 0; }
+                    dataMap[yr] += sessionMins;
+                }
+            }
+        });
+
+        const catLabels = Object.keys(categoriesMap);
+        const catMinutes = catLabels.map(l => categoriesMap[l]);
+        const catTotal = catMinutes.reduce((a, b) => a + b, 0) || 1;
+        const catPercentages = catMinutes.map(m => Math.round((m / catTotal) * 100));
+
+        chartData = {
+            totalMinutes,
+            totalHoursFormatted: (totalMinutes / 60).toFixed(1),
+            labels,
+            dataHours: labels.map(l => parseFloat(((dataMap[l] || 0) / 60).toFixed(1))),
+            categories: {
+                labels: catLabels,
+                dataMinutes: catMinutes,
+                percentages: catPercentages,
+                formattedLabels: catLabels.map((l, i) => `${l} · ${catPercentages[i]}%`)
+            },
+            tonalities: {
+                labels: Object.keys(tonalitiesMap),
+                counts: Object.values(tonalitiesMap)
+            }
+        };
+    }
+
+    document.getElementById('total-temps-graph').innerText = t('history.total_hours', { hours: chartData.totalHoursFormatted });
+    if (monGraphique) {
+        try { monGraphique.destroy(); } catch (e) { }
+        monGraphique = null;
+    }
+    if (typeof Chart !== 'undefined' && typeof Chart.getChart === 'function') {
+        const existing = Chart.getChart('myChart');
+        if (existing) {
+            try { existing.destroy(); } catch (e) { }
+        }
+    }
+    const ctx = document.getElementById('myChart').getContext('2d');
+    const titre = document.getElementById('titre-graph');
 
     // Couleurs dynamiques héritées du thème CSS actif
     const rootStyle = getComputedStyle(document.documentElement);
@@ -4073,30 +4282,481 @@ function changerPeriodeGraph(periode) {
 
     if (graphTypeActuel === 'temps') {
         titre.textContent = t('history.chart_time_spent');
-        if (totalMinutes === 0) {
-            monGraphique = new Chart(ctx, { type: 'bar', data: { labels: [t('history.no_data')], datasets: [{ label: t('history.hours_label'), data: [0], backgroundColor: themeBorder, borderRadius: 4 }] }, options: { responsive: true, color: themeText, scales: { y: { display: false }, x: { display: false } }, plugins: { legend: { display: false } } } });
+        if (chartData.totalMinutes === 0) {
+            monGraphique = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [t('history.no_data')],
+                    datasets: [{ label: t('history.hours_label'), data: [0], backgroundColor: themeBorder, borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true,
+                    color: themeText,
+                    scales: { y: { display: false }, x: { display: false } },
+                    plugins: { legend: { display: false } }
+                }
+            });
         } else {
-            monGraphique = new Chart(ctx, { type: 'bar', data: { labels: labelsData, datasets: [{ label: t('history.hours_label'), data: labelsData.map(l => parseFloat((dataMap[l] / 60).toFixed(1))), backgroundColor: themeAccent, borderRadius: 6, maxBarThickness: 40 }] }, options: { responsive: true, color: themeText, scales: { y: { grid: { color: themeBorder }, ticks: { color: themeMuted } }, x: { grid: { display: false }, ticks: { color: themeMuted } } }, plugins: { legend: { display: false } } } });
+            monGraphique = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: t('history.hours_label'),
+                        data: chartData.dataHours,
+                        backgroundColor: themeAccent,
+                        borderRadius: 6,
+                        maxBarThickness: 40
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    color: themeText,
+                    scales: {
+                        y: { grid: { color: themeBorder }, ticks: { color: themeMuted } },
+                        x: { grid: { display: false }, ticks: { color: themeMuted } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
     } else if (graphTypeActuel === 'categories') {
         titre.textContent = t('history.chart_time_dist');
-        if (Object.keys(statsCategories).length === 0) {
-            monGraphique = new Chart(ctx, { type: 'doughnut', data: { labels: [t('history.no_data')], datasets: [{ data: [1], backgroundColor: [themeBorder], borderColor: themeCard, borderWidth: 2 }] }, options: { responsive: true, color: themeText, plugins: { tooltip: { enabled: false }, legend: { display: false } } } });
+        const categories = chartData.categories || { labels: [], dataMinutes: [], percentages: [], formattedLabels: [] };
+        if (!categories.labels || categories.labels.length === 0) {
+            monGraphique = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [t('history.no_data')],
+                    datasets: [{ data: [1], backgroundColor: [themeBorder], borderColor: themeCard, borderWidth: 2 }]
+                },
+                options: {
+                    responsive: true,
+                    color: themeText,
+                    plugins: { tooltip: { enabled: false }, legend: { display: false } }
+                }
+            });
         } else {
-            monGraphique = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(statsCategories), datasets: [{ data: Object.values(statsCategories), backgroundColor: colorsPalette, borderColor: themeCard, borderWidth: 2 }] }, options: { responsive: true, color: themeText, plugins: { legend: { labels: { color: themeText } } } } });
+            const isThemeClair = document.documentElement.getAttribute('data-theme') === 'clair' || document.documentElement.getAttribute('data-theme') === 'creme';
+            const doughnutPalette = (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.getCategoryPalette === 'function')
+                ? window.HistoryAnalytics.getCategoryPalette(categories.labels.length, isThemeClair)
+                : ((typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.getContrastingPalette === 'function')
+                    ? window.HistoryAnalytics.getContrastingPalette(colorsPalette, categories.labels.length, isThemeClair)
+                    : colorsPalette);
+
+            const pluginsList = [];
+            if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.createCategoryDoughnutPlugin === 'function') {
+                pluginsList.push(window.HistoryAnalytics.createCategoryDoughnutPlugin({
+                    textColor: themeText,
+                    textMutedColor: themeMuted,
+                    textSecondaryColor: themeAccentSec,
+                    centerTitleColor: isThemeClair ? themeAccentSec : themeText,
+                    isLight: isThemeClair
+                }));
+            }
+
+            const durationsFormatted = categories.dataMinutes.map(m => (typeof formatDureeHistorique === 'function' ? formatDureeHistorique(m) : `${m} min`));
+
+            monGraphique = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: categories.labels,
+                    formattedLabels: categories.formattedLabels,
+                    durationsFormatted: durationsFormatted,
+                    totalHoursFormatted: chartData.totalHoursFormatted,
+                    datasets: [{
+                        data: categories.dataMinutes,
+                        backgroundColor: doughnutPalette,
+                        borderColor: themeCard,
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                plugins: pluginsList,
+                options: {
+                    responsive: true,
+                    color: themeText,
+                    cutout: '58%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
         }
     } else if (graphTypeActuel === 'tonalites') {
         titre.textContent = t('history.chart_sessions_key');
-        if (Object.keys(statsTonalites).length === 0) {
-            monGraphique = new Chart(ctx, { type: 'bar', data: { labels: [t('history.no_data')], datasets: [{ label: t('history.sessions_count'), data: [0], backgroundColor: themeBorder, borderRadius: 4, maxBarThickness: 40 }] }, options: { responsive: true, color: themeText, scales: { y: { ticks: { stepSize: 1, color: themeMuted }, grid: { color: themeBorder } }, x: { ticks: { color: themeMuted }, grid: { display: false } } }, plugins: { legend: { display: false } } } });
+        const tonalities = chartData.tonalities || { labels: [], counts: [] };
+        if (!tonalities.labels || tonalities.labels.length === 0) {
+            monGraphique = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [t('history.no_data')],
+                    datasets: [{ label: t('history.sessions_count'), data: [0], backgroundColor: themeBorder, borderRadius: 4, maxBarThickness: 40 }]
+                },
+                options: {
+                    responsive: true,
+                    color: themeText,
+                    scales: {
+                        y: { ticks: { stepSize: 1, color: themeMuted }, grid: { color: themeBorder } },
+                        x: { ticks: { color: themeMuted }, grid: { display: false } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         } else {
-            const bgColors = Object.keys(statsTonalites).map((_, i) => colorsPalette[i % colorsPalette.length]);
-            const labelsNettoyes = Object.keys(statsTonalites).map(ton => formatTonalite(ton));
-            monGraphique = new Chart(ctx, { type: 'bar', data: { labels: labelsNettoyes, datasets: [{ label: t('history.sessions_count'), data: Object.values(statsTonalites), backgroundColor: bgColors, borderRadius: 6, maxBarThickness: 40 }] }, options: { responsive: true, color: themeText, scales: { y: { ticks: { stepSize: 1, color: themeMuted }, grid: { color: themeBorder } }, x: { ticks: { color: themeMuted }, grid: { display: false } } }, plugins: { legend: { display: false } } } });
+            const bgColors = tonalities.labels.map((_, i) => colorsPalette[i % colorsPalette.length]);
+            const labelsNettoyes = tonalities.labels.map(ton => formatTonalite(ton));
+            monGraphique = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labelsNettoyes,
+                    datasets: [{
+                        label: t('history.sessions_count'),
+                        data: tonalities.counts,
+                        backgroundColor: bgColors,
+                        borderRadius: 6,
+                        maxBarThickness: 40
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    color: themeText,
+                    scales: {
+                        y: { ticks: { stepSize: 1, color: themeMuted }, grid: { color: themeBorder } },
+                        x: { ticks: { color: themeMuted }, grid: { display: false } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
     }
 }
 function fermerModal() { document.getElementById('modal-graph').style.display = 'none'; }
+
+function updateCardObjectifUI(weeklyGoal) {
+    const goalEl = document.getElementById('stat-objectif-pct');
+    const barContainer = document.getElementById('stat-objectif-bar-container');
+    const barFill = document.getElementById('stat-objectif-bar-fill');
+    if (!goalEl) return;
+
+    if (!weeklyGoal || !weeklyGoal.hasGoal) {
+        goalEl.textContent = (typeof t === 'function' ? t('history.set_goal_hint') : null) || "Cliquer pour fixer un objectif";
+        goalEl.style.fontSize = "12px";
+        goalEl.style.fontWeight = "500";
+        goalEl.style.color = "var(--text-muted)";
+        goalEl.style.opacity = "0.7";
+        if (barContainer) barContainer.style.display = "none";
+    } else {
+        goalEl.textContent = weeklyGoal.formattedPercentage;
+        goalEl.style.fontSize = "20px";
+        goalEl.style.fontWeight = "700";
+        goalEl.style.opacity = "1";
+
+        if (weeklyGoal.isCompleted) {
+            goalEl.style.color = "var(--accent-secondary)";
+        } else {
+            goalEl.style.color = "var(--text-primary)";
+        }
+
+        if (barContainer && barFill) {
+            barContainer.style.display = "block";
+            const fillPct = Math.min(100, Math.round(weeklyGoal.progressRatio * 100));
+            barFill.style.width = `${fillPct}%`;
+            if (weeklyGoal.isCompleted) {
+                barFill.style.backgroundColor = "var(--accent-secondary)";
+            } else {
+                barFill.style.backgroundColor = "var(--accent-amber)";
+            }
+        }
+    }
+}
+window.updateCardObjectifUI = updateCardObjectifUI;
+
+// --- MODALE OBJECTIF HEBDOMADAIRE ---
+function ouvrirModalObjectifHebdo(event) {
+    if (event) event.stopPropagation();
+    const rawGoal = localStorage.getItem('piano_workout_weekly_goal_hours');
+    let val = rawGoal ? parseInt(rawGoal, 10) : 0;
+    if (isNaN(val) || val < 0) val = 0;
+
+    syncObjectifHebdoDisplay(val);
+    attacherControlesObjectifInteractifs();
+
+    const modal = document.getElementById('modal-objectif-hebdo');
+    if (modal) modal.style.display = 'flex';
+}
+window.ouvrirModalObjectifHebdo = ouvrirModalObjectifHebdo;
+
+function fermerModalObjectifHebdo() {
+    const modal = document.getElementById('modal-objectif-hebdo');
+    if (modal) modal.style.display = 'none';
+}
+window.fermerModalObjectifHebdo = fermerModalObjectifHebdo;
+
+function syncObjectifHebdoDisplay(v) {
+    const input = document.getElementById('input-goal-hours');
+    if (input) input.value = v;
+
+    const displayVal = document.getElementById('display-goal-hours-val');
+    const displayUnit = document.getElementById('display-goal-hours-unit');
+
+    if (displayVal && displayUnit) {
+        if (v === 0) {
+            displayVal.textContent = '0';
+            displayVal.style.color = 'var(--text-muted)';
+            displayUnit.textContent = (typeof t === 'function' ? t('history.no_goal_label') : null) || "Ne pas définir d'objectif";
+            displayUnit.style.color = 'var(--text-muted)';
+        } else {
+            displayVal.textContent = v;
+            displayVal.style.color = 'var(--accent-amber)';
+            displayUnit.textContent = v > 1 ? 'HEURES / SEMAINE' : 'HEURE / SEMAINE';
+            displayUnit.style.color = 'var(--text-muted)';
+        }
+    }
+}
+
+function fixerObjectifHebdo(val) {
+    let v = parseInt(val, 10);
+    if (isNaN(v) || v < 0) v = 0;
+    if (v > 168) v = 168; // 7 * 24 heures maximum
+
+    syncObjectifHebdoDisplay(v);
+
+    if (v === 0) {
+        localStorage.removeItem('piano_workout_weekly_goal_hours');
+    } else {
+        localStorage.setItem('piano_workout_weekly_goal_hours', v.toString());
+    }
+
+    chargerHistorique();
+}
+window.fixerObjectifHebdo = fixerObjectifHebdo;
+
+function changerObjectifHebdo(delta) {
+    const input = document.getElementById('input-goal-hours');
+    let cur = parseInt(input ? input.value : 0, 10);
+    if (isNaN(cur)) cur = 0;
+    fixerObjectifHebdo(cur + delta);
+}
+window.changerObjectifHebdo = changerObjectifHebdo;
+
+let goalTimeDragState = { active: false, startY: 0, startVal: 0 };
+function attacherControlesObjectifInteractifs() {
+    const zone = document.getElementById('goal-time-swipe-zone');
+    if (!zone || zone.dataset.interactiveAttached === 'true') return;
+    zone.dataset.interactiveAttached = 'true';
+
+    zone.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 1 : -1;
+        const input = document.getElementById('input-goal-hours');
+        const cur = parseInt(input ? input.value : 0, 10) || 0;
+        fixerObjectifHebdo(cur + delta);
+    }, { passive: false });
+
+    const onStart = (clientY) => {
+        goalTimeDragState.active = true;
+        goalTimeDragState.startY = clientY;
+        const input = document.getElementById('input-goal-hours');
+        goalTimeDragState.startVal = parseInt(input ? input.value : 0, 10) || 0;
+        zone.classList.add('dragging');
+    };
+
+    const onMove = (clientY) => {
+        if (!goalTimeDragState.active) return;
+        const diffY = goalTimeDragState.startY - clientY;
+        const deltaHours = Math.round(diffY / 14);
+        fixerObjectifHebdo(goalTimeDragState.startVal + deltaHours);
+    };
+
+    const onEnd = () => {
+        if (!goalTimeDragState.active) return;
+        goalTimeDragState.active = false;
+        zone.classList.remove('dragging');
+    };
+
+    zone.addEventListener('mousedown', (e) => { e.preventDefault(); onStart(e.clientY); });
+    window.addEventListener('mousemove', (e) => { if (goalTimeDragState.active) onMove(e.clientY); });
+    window.addEventListener('mouseup', onEnd);
+
+    zone.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            e.preventDefault();
+            onStart(e.touches[0].clientY);
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+        if (goalTimeDragState.active && e.touches.length === 1) {
+            onMove(e.touches[0].clientY);
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
+}
+
+// --- MODALE RÉGULARITÉ & SÉRIES ---
+let streakCalCurrentYear = null;
+let streakCalCurrentMonth = null;
+
+function naviguerMoisStreak(delta) {
+    if (streakCalCurrentYear === null || streakCalCurrentMonth === null) {
+        const now = new Date();
+        streakCalCurrentYear = now.getFullYear();
+        streakCalCurrentMonth = now.getMonth();
+    }
+    streakCalCurrentMonth += delta;
+    if (streakCalCurrentMonth < 0) {
+        streakCalCurrentMonth = 11;
+        streakCalCurrentYear--;
+    } else if (streakCalCurrentMonth > 11) {
+        streakCalCurrentMonth = 0;
+        streakCalCurrentYear++;
+    }
+    renderStreakCalendar();
+}
+window.naviguerMoisStreak = naviguerMoisStreak;
+
+function renderStreakCalendar() {
+    const now = new Date();
+    if (streakCalCurrentYear === null || streakCalCurrentMonth === null) {
+        streakCalCurrentYear = now.getFullYear();
+        streakCalCurrentMonth = now.getMonth();
+    }
+
+    const locale = typeof getLocaleCode === 'function' ? getLocaleCode() : 'fr-FR';
+
+    let cal;
+    if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.calculateMonthCalendar === 'function') {
+        cal = window.HistoryAnalytics.calculateMonthCalendar(historiquesTerminees, streakCalCurrentYear, streakCalCurrentMonth, { now, locale });
+    } else {
+        cal = {
+            year: streakCalCurrentYear,
+            month: streakCalCurrentMonth,
+            monthTitle: `${streakCalCurrentYear}-${streakCalCurrentMonth + 1}`,
+            weekdays: ['L', 'M', 'M', 'J', 'V', 'S', 'D'],
+            days: [],
+            monthActiveDays: 0,
+            daysInMonth: 31,
+            activeRatioFormatted: '0 j'
+        };
+    }
+
+    // 1. Titre et pratique du mois
+    const titleEl = document.getElementById('streak-cal-month-title');
+    if (titleEl) titleEl.textContent = cal.monthTitle;
+
+    const subtitleEl = document.getElementById('streak-cal-month-subtitle');
+    const isEn = (typeof getCurrentLang === 'function' && getCurrentLang() === 'en') || locale.startsWith('en');
+    const count = cal.monthActiveDays || 0;
+
+    if (count > 0) {
+        if (subtitleEl) {
+            subtitleEl.textContent = isEn
+                ? `${count} practice ${count > 1 ? 'days' : 'day'}`
+                : `${count} ${count > 1 ? 'jours' : 'jour'} de pratique`;
+            subtitleEl.style.display = 'inline';
+        }
+    } else {
+        if (subtitleEl) {
+            subtitleEl.textContent = '';
+            subtitleEl.style.display = 'none';
+        }
+    }
+
+    // 2. En-têtes des jours de la semaine
+    const weekdaysEl = document.getElementById('streak-cal-weekdays');
+    if (weekdaysEl) {
+        weekdaysEl.innerHTML = cal.weekdays.map(w => `<span style="font-size: 11px; font-weight: 700; color: var(--text-muted); opacity: 0.8;">${w}</span>`).join('');
+    }
+
+    // 3. Grille des jours
+    const daysEl = document.getElementById('streak-cal-days');
+    if (daysEl) {
+        daysEl.innerHTML = cal.days.map(day => {
+            const isCur = day.isCurrentMonth;
+            const hasPrat = day.hasPractice;
+            const isToday = day.isToday;
+
+            let bg = 'transparent';
+            let color = isCur ? 'var(--text-primary)' : 'var(--text-muted)';
+            let opacity = isCur ? '1' : '0.28';
+            let border = '2px solid transparent';
+            let fontWeight = isCur ? '600' : '400';
+
+            if (hasPrat && isCur) {
+                bg = 'var(--accent-amber)';
+                color = '#110d0a';
+                fontWeight = '800';
+            }
+
+            if (isToday) {
+                border = hasPrat ? '2px solid var(--text-primary)' : '2px solid var(--accent-amber)';
+                fontWeight = '800';
+            }
+
+            const title = `${day.dateKey}${day.totalMinutes ? ` : ${day.totalMinutes} min` : ''}`;
+
+            return `
+                <div style="width: 34px; height: 34px; box-sizing: border-box; border-radius: 999px; background: ${bg}; border: ${border}; opacity: ${opacity}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: ${fontWeight}; color: ${color}; cursor: pointer; transition: transform 0.1s ease;" title="${title}">
+                    ${day.dayNum}
+                </div>`;
+        }).join('');
+    }
+}
+window.renderStreakCalendar = renderStreakCalendar;
+
+function ouvrirModalStreak(event) {
+    if (event) event.stopPropagation();
+
+    const now = new Date();
+    streakCalCurrentYear = now.getFullYear();
+    streakCalCurrentMonth = now.getMonth();
+
+    let stats;
+    if (typeof window !== 'undefined' && window.HistoryAnalytics && typeof window.HistoryAnalytics.calculateStreakStats === 'function') {
+        stats = window.HistoryAnalytics.calculateStreakStats(historiquesTerminees, now);
+    } else {
+        stats = {
+            currentStreak: 0,
+            maxStreak: 0,
+            monthActiveDays: 0,
+            totalActiveDays: 0
+        };
+    }
+
+    const curEl = document.getElementById('streak-modal-current');
+    if (curEl) {
+        const span = curEl.querySelector('span');
+        if (span) span.textContent = `${stats.currentStreak} j`;
+    }
+
+    const recEl = document.getElementById('streak-modal-record');
+    if (recEl) {
+        const span = recEl.querySelector('span');
+        if (span) span.textContent = `${stats.maxStreak} j`;
+    }
+
+    const monthEl = document.getElementById('streak-modal-month');
+    if (monthEl) {
+        const span = monthEl.querySelector('span');
+        if (span) span.textContent = `${stats.monthActiveDays} j`;
+    }
+
+    renderStreakCalendar();
+
+    const modal = document.getElementById('modal-streak-detail');
+    if (modal) modal.style.display = 'flex';
+}
+window.ouvrirModalStreak = ouvrirModalStreak;
+
+function fermerModalStreak() {
+    const modal = document.getElementById('modal-streak-detail');
+    if (modal) modal.style.display = 'none';
+}
+window.fermerModalStreak = fermerModalStreak;
 
 
 // ==========================================
@@ -4107,6 +4767,8 @@ const MODAL_BACKDROP_CLOSERS = {
     'modal-metronome': () => typeof fermerModalMetronome === 'function' && fermerModalMetronome(),
     'modal-dictaphone': () => typeof fermerModalDictaphone === 'function' && fermerModalDictaphone(),
     'modal-graph': () => typeof fermerModal === 'function' && fermerModal(),
+    'modal-objectif-hebdo': () => typeof fermerModalObjectifHebdo === 'function' && fermerModalObjectifHebdo(),
+    'modal-streak-detail': () => typeof fermerModalStreak === 'function' && fermerModalStreak(),
     'modal-image-fullscreen': () => typeof fermerModalImage === 'function' && fermerModalImage(),
     'modal-routines': () => typeof fermerModalRoutines === 'function' && fermerModalRoutines(),
     'modal-save-routine': () => typeof fermerModalSaveRoutine === 'function' && fermerModalSaveRoutine(),
@@ -5478,8 +6140,34 @@ let partitionState = {
     titre: '',
     sourceNom: '',
     hudVisible: true,
-    renderTask: null
+    renderTask: null,
+    prevRenderTask: null,
+    nextRenderTask: null,
+    renderedPageIndex: null,
+    prevRenderedPageIndex: null,
+    nextRenderedPageIndex: null
 };
+
+const scoreNavMachine = (typeof ScoreNavigation !== 'undefined' && typeof ScoreNavigation.createNavigationMachine === 'function')
+    ? ScoreNavigation.createNavigationMachine()
+    : null;
+
+function syncScoreNavMachine() {
+    if (!scoreNavMachine) return null;
+    return scoreNavMachine.loadDocument({
+        type: partitionState.type,
+        sourceNom: partitionState.sourceNom,
+        titre: partitionState.titre,
+        itemId: partitionState.itemId || null,
+        totalCount: partitionState.totalCount,
+        currentIndex: partitionState.currentIndex,
+        isLiveMode: !!(typeof concertState !== 'undefined' && concertState.isActive),
+        setlistSongs: (typeof concertState !== 'undefined' && Array.isArray(concertState.morceaux)) ? concertState.morceaux : [],
+        currentSongIndex: (typeof concertState !== 'undefined') ? (concertState.currentIndex || 0) : 0,
+        isAnnotationActive: !!(typeof annotationState !== 'undefined' && annotationState.isEditing),
+        activeTool: (typeof annotationState !== 'undefined' && annotationState.activeTool) ? annotationState.activeTool : 'pen'
+    });
+}
 
 // --- MOTEUR D'ANNOTATIONS AU STYLET (STYLE MOBILESHEETS) ---
 let annotationState = {
@@ -5662,6 +6350,10 @@ async function chargerMorceauConcert(songIdx, targetPage = 0) {
         }
     } else {
         if (canvas) canvas.style.display = 'none';
+        const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+        if (prevCanvas) prevCanvas.style.display = 'none';
+        const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
+        if (nextCanvas) nextCanvas.style.display = 'none';
         if (img) img.style.display = 'none';
         const annoCanvas = document.getElementById('annotation-canvas');
         if (annoCanvas) {
@@ -5674,6 +6366,7 @@ async function chargerMorceauConcert(songIdx, targetPage = 0) {
         partitionState.totalCount = 1;
         partitionState.currentIndex = 0;
         partitionState.titre = song.titre || t('score.default_title');
+        syncScoreNavMachine();
 
         afficherCarteConcertSansPartition(song);
     }
@@ -6045,13 +6738,20 @@ async function chargerEtAfficherPdf(source, initialPage = 0) {
     partitionState.currentIndex = 0;
     fullscreenIndex = 0;
     partitionState.sourceNom = typeof source === 'string' ? source : 'partition.pdf';
+    partitionState.renderedPageIndex = null;
+    partitionState.prevRenderedPageIndex = null;
+    partitionState.nextRenderedPageIndex = null;
 
     const canvas = document.getElementById('pdf-render-canvas');
+    const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+    const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
     const img = document.getElementById('image-fullscreen-src');
     const loader = document.getElementById('partition-loading');
 
     if (img) img.style.display = 'none';
     if (canvas) canvas.style.display = 'none';
+    if (prevCanvas) prevCanvas.style.display = 'none';
+    if (nextCanvas) nextCanvas.style.display = 'none';
     if (loader) loader.style.display = 'flex';
 
     try {
@@ -6080,8 +6780,9 @@ async function chargerEtAfficherPdf(source, initialPage = 0) {
             : (typeof initialPage === 'number' ? Math.max(0, Math.min(partitionState.totalCount - 1, initialPage)) : 0);
         partitionState.currentIndex = targetIdx;
         fullscreenIndex = targetIdx;
+        syncScoreNavMachine();
 
-        await afficherPagePdf(targetIdx);
+        await afficherPagePdf(targetIdx, { forceRender: true });
     } catch (err) {
         console.error('Erreur chargement PDF:', err);
         if (loader) loader.style.display = 'none';
@@ -6090,66 +6791,236 @@ async function chargerEtAfficherPdf(source, initialPage = 0) {
     }
 }
 
-async function afficherPagePdf(pageIdx) {
+function annulerRendusVoisinsPdf() {
+    if (partitionState.prevRenderTask) {
+        try { partitionState.prevRenderTask.cancel(); } catch (e) { }
+        partitionState.prevRenderTask = null;
+    }
+    if (partitionState.nextRenderTask) {
+        try { partitionState.nextRenderTask.cancel(); } catch (e) { }
+        partitionState.nextRenderTask = null;
+    }
+}
+
+async function rendrePagePdfSurCanvas(pageIdx, targetCanvas, taskKey) {
+    if (!partitionState.pdfDoc || !targetCanvas) return false;
+    if (pageIdx === null || pageIdx === undefined || pageIdx < 0 || pageIdx >= partitionState.totalCount) return false;
+
+    if (taskKey && partitionState[taskKey]) {
+        try { partitionState[taskKey].cancel(); } catch (e) { }
+        partitionState[taskKey] = null;
+    }
+
+    const pageNum = pageIdx + 1;
+    const page = await partitionState.pdfDoc.getPage(pageNum);
+
+    const container = document.getElementById('fullscreen-swipe-container');
+    const availW = (container ? container.clientWidth : window.innerWidth) || window.innerWidth;
+    const availH = (container ? container.clientHeight : window.innerHeight) || window.innerHeight;
+
+    const unscaledViewport = page.getViewport({ scale: 1 });
+    const dpr = window.devicePixelRatio || 1;
+
+    const maxW = Math.max(200, availW - 24);
+    const maxH = Math.max(200, availH - 24);
+    const scaleX = maxW / unscaledViewport.width;
+    const scaleY = maxH / unscaledViewport.height;
+    const baseScale = Math.min(scaleX, scaleY);
+
+    const scaledViewport = page.getViewport({ scale: baseScale * dpr });
+    const targetW = Math.floor(scaledViewport.width);
+    const targetH = Math.floor(scaledViewport.height);
+    const cssW = `${Math.floor(scaledViewport.width / dpr)}px`;
+    const cssH = `${Math.floor(scaledViewport.height / dpr)}px`;
+
+    // Rendre d'abord dans un buffer hors-écran pour éviter tout flash ou clearRect sur un canvas visible
+    const offscreen = document.createElement('canvas');
+    offscreen.width = targetW;
+    offscreen.height = targetH;
+    const offCtx = offscreen.getContext('2d');
+
+    const renderTask = page.render({
+        canvasContext: offCtx,
+        viewport: scaledViewport
+    });
+    if (taskKey) partitionState[taskKey] = renderTask;
+
+    await renderTask.promise;
+    if (taskKey && partitionState[taskKey] === renderTask) {
+        partitionState[taskKey] = null;
+    }
+
+    targetCanvas.width = targetW;
+    targetCanvas.height = targetH;
+    targetCanvas.style.width = cssW;
+    targetCanvas.style.height = cssH;
+    const ctx = targetCanvas.getContext('2d');
+    ctx.drawImage(offscreen, 0, 0);
+    return true;
+}
+
+function copierBufferCanvasPdf(srcCanvas, destCanvas) {
+    if (!srcCanvas || !destCanvas || srcCanvas.width === 0 || srcCanvas.height === 0) return false;
+    destCanvas.width = srcCanvas.width;
+    destCanvas.height = srcCanvas.height;
+    destCanvas.style.width = srcCanvas.style.width;
+    destCanvas.style.height = srcCanvas.style.height;
+    const ctx = destCanvas.getContext('2d');
+    ctx.drawImage(srcCanvas, 0, 0);
+    return true;
+}
+
+function positionnerCanvasVoisinsPdf() {
+    const container = document.getElementById('fullscreen-swipe-container');
+    const vw = (container ? container.clientWidth : window.innerWidth) || window.innerWidth;
+    const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+    const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
+    const isTransitioning = !!_partitionPageTurnTimer;
+
+    if (prevCanvas) {
+        if (!isTransitioning && partitionState.type === 'pdf' && partitionState.prevRenderedPageIndex !== null && prevCanvas.width > 0) {
+            prevCanvas.style.transform = `translate3d(${-vw}px, 0, 0)`;
+            prevCanvas.style.display = 'block';
+        } else {
+            prevCanvas.style.display = 'none';
+        }
+    }
+    if (nextCanvas) {
+        if (!isTransitioning && partitionState.type === 'pdf' && partitionState.nextRenderedPageIndex !== null && nextCanvas.width > 0) {
+            nextCanvas.style.transform = `translate3d(${vw}px, 0, 0)`;
+            nextCanvas.style.display = 'block';
+        } else {
+            nextCanvas.style.display = 'none';
+        }
+    }
+}
+
+async function prerendrePagesAdjacentesPdf(currentPageIdx) {
+    if (!partitionState.pdfDoc || partitionState.type !== 'pdf') return;
+    annulerRendusVoisinsPdf();
+
+    const targets = ScoreNavigation.getPrerenderTargets(currentPageIdx, partitionState.totalCount, 'pdf');
+    const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+    const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
+
+    if (targets.prev === null) {
+        partitionState.prevRenderedPageIndex = null;
+        if (prevCanvas) prevCanvas.style.display = 'none';
+    }
+    if (targets.next === null) {
+        partitionState.nextRenderedPageIndex = null;
+        if (nextCanvas) nextCanvas.style.display = 'none';
+    }
+    positionnerCanvasVoisinsPdf();
+
+    // Pré-rendu silencieux de N+1 en priorité, puis N-1
+    if (targets.next !== null && nextCanvas && partitionState.nextRenderedPageIndex !== targets.next) {
+        try {
+            const ok = await rendrePagePdfSurCanvas(targets.next, nextCanvas, 'nextRenderTask');
+            if (ok && partitionState.currentIndex === currentPageIdx) {
+                partitionState.nextRenderedPageIndex = targets.next;
+                positionnerCanvasVoisinsPdf();
+            }
+        } catch (err) {
+            if (err && err.name !== 'RenderingCancelledException') {
+                console.warn('Erreur pré-rendu page PDF N+1:', err);
+            }
+        }
+    }
+
+    if (targets.prev !== null && prevCanvas && partitionState.prevRenderedPageIndex !== targets.prev) {
+        try {
+            const ok = await rendrePagePdfSurCanvas(targets.prev, prevCanvas, 'prevRenderTask');
+            if (ok && partitionState.currentIndex === currentPageIdx) {
+                partitionState.prevRenderedPageIndex = targets.prev;
+                positionnerCanvasVoisinsPdf();
+            }
+        } catch (err) {
+            if (err && err.name !== 'RenderingCancelledException') {
+                console.warn('Erreur pré-rendu page PDF N-1:', err);
+            }
+        }
+    }
+}
+
+function essayerBasculeBufferCachePdf(pageIdx, canvas, prevCanvas, nextCanvas) {
+    const isForward = (pageIdx === partitionState.nextRenderedPageIndex && nextCanvas && nextCanvas.width > 0);
+    const isBackward = (!isForward && pageIdx === partitionState.prevRenderedPageIndex && prevCanvas && prevCanvas.width > 0);
+    if (!isForward && !isBackward) return false;
+
+    const hitCanvas = isForward ? nextCanvas : prevCanvas;
+    const oppositeCanvas = isForward ? prevCanvas : nextCanvas;
+    const expectedOldIdx = isForward ? (pageIdx - 1) : (pageIdx + 1);
+    const oldCurrentIdx = partitionState.renderedPageIndex;
+
+    const tempOff = document.createElement('canvas');
+    if (oldCurrentIdx !== null && canvas.width > 0) {
+        copierBufferCanvasPdf(canvas, tempOff);
+    }
+    copierBufferCanvasPdf(hitCanvas, canvas);
+    partitionState.renderedPageIndex = pageIdx;
+
+    if (oldCurrentIdx === expectedOldIdx && oppositeCanvas && tempOff.width > 0) {
+        copierBufferCanvasPdf(tempOff, oppositeCanvas);
+        if (isForward) partitionState.prevRenderedPageIndex = oldCurrentIdx;
+        else partitionState.nextRenderedPageIndex = oldCurrentIdx;
+    } else {
+        if (isForward) partitionState.prevRenderedPageIndex = null;
+        else partitionState.nextRenderedPageIndex = null;
+    }
+
+    if (isForward) partitionState.nextRenderedPageIndex = null;
+    else partitionState.prevRenderedPageIndex = null;
+    return true;
+}
+
+async function afficherPagePdf(pageIdx, options = {}) {
     if (!partitionState.pdfDoc) return;
     const canvas = document.getElementById('pdf-render-canvas');
+    const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+    const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
     const img = document.getElementById('image-fullscreen-src');
     const loader = document.getElementById('partition-loading');
     if (!canvas) return;
 
     if (img) img.style.display = 'none';
     canvas.style.display = 'block';
-    if (loader) loader.style.display = 'flex';
 
-    if (partitionState.renderTask) {
-        try { partitionState.renderTask.cancel(); } catch (e) { }
-        partitionState.renderTask = null;
+    const forceRender = !!options.forceRender;
+    let swappedFromCache = false;
+
+    if (!forceRender) {
+        swappedFromCache = essayerBasculeBufferCachePdf(pageIdx, canvas, prevCanvas, nextCanvas);
+    } else {
+        partitionState.prevRenderedPageIndex = null;
+        partitionState.nextRenderedPageIndex = null;
     }
 
-    try {
-        const pageNum = pageIdx + 1;
-        const page = await partitionState.pdfDoc.getPage(pageNum);
-
-        const container = document.getElementById('fullscreen-swipe-container');
-        const availW = (container ? container.clientWidth : window.innerWidth) || window.innerWidth;
-        const availH = (container ? container.clientHeight : window.innerHeight) || window.innerHeight;
-
-        const unscaledViewport = page.getViewport({ scale: 1 });
-        const dpr = window.devicePixelRatio || 1;
-
-        // Calcul du meilleur ajustement (contain) avec marge de respiration de 24px
-        const maxW = Math.max(200, availW - 24);
-        const maxH = Math.max(200, availH - 24);
-        const scaleX = maxW / unscaledViewport.width;
-        const scaleY = maxH / unscaledViewport.height;
-        const baseScale = Math.min(scaleX, scaleY);
-
-        const scaledViewport = page.getViewport({ scale: baseScale * dpr });
-
-        canvas.width = Math.floor(scaledViewport.width);
-        canvas.height = Math.floor(scaledViewport.height);
-        canvas.style.width = `${Math.floor(scaledViewport.width / dpr)}px`;
-        canvas.style.height = `${Math.floor(scaledViewport.height / dpr)}px`;
-
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        const renderContext = {
-            canvasContext: ctx,
-            viewport: scaledViewport
-        };
-        partitionState.renderTask = page.render(renderContext);
-        await partitionState.renderTask.promise;
-    } catch (err) {
-        if (err.name !== 'RenderingCancelledException') {
-            console.error('Erreur rendu page PDF:', err);
+    if (!swappedFromCache) {
+        if (loader && partitionState.renderedPageIndex === null) {
+            loader.style.display = 'flex';
         }
-    } finally {
-        if (loader) loader.style.display = 'none';
-        majUIPartition();
-        alignerAnnotationCanvas();
-        await chargerAnnotationsPageCourante();
+        try {
+            const ok = await rendrePagePdfSurCanvas(pageIdx, canvas, 'renderTask');
+            if (ok) {
+                partitionState.renderedPageIndex = pageIdx;
+            }
+        } catch (err) {
+            if (err && err.name !== 'RenderingCancelledException') {
+                console.error('Erreur rendu page PDF:', err);
+            }
+        } finally {
+            if (loader) loader.style.display = 'none';
+        }
+    } else if (loader) {
+        loader.style.display = 'none';
     }
+
+    syncScoreNavMachine();
+    majUIPartition();
+    alignerAnnotationCanvas();
+    await chargerAnnotationsPageCourante();
+    prerendrePagesAdjacentesPdf(pageIdx);
 }
 
 async function chargerEtAfficherImage(source, initialPage = 0) {
@@ -6173,10 +7044,14 @@ async function chargerEtAfficherImage(source, initialPage = 0) {
 
 async function afficherPageImage(pageIdx) {
     const canvas = document.getElementById('pdf-render-canvas');
+    const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+    const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
     const img = document.getElementById('image-fullscreen-src');
     const loader = document.getElementById('partition-loading');
 
     if (canvas) canvas.style.display = 'none';
+    if (prevCanvas) prevCanvas.style.display = 'none';
+    if (nextCanvas) nextCanvas.style.display = 'none';
     if (loader) loader.style.display = 'none';
     if (!img) return;
 
@@ -6184,6 +7059,7 @@ async function afficherPageImage(pageIdx) {
     const nomFichier = partitionState.images[pageIdx];
     const urlFichier = nomFichier.startsWith('data:') ? nomFichier : await getFichierUrl(nomFichier);
 
+    syncScoreNavMachine();
     majUIPartition();
     await new Promise(resolve => {
         let settled = false;
@@ -6217,19 +7093,8 @@ function majUIPartition() {
 }
 
 function peutChangerPartitionPage(delta) {
-    if (partitionState.type === 'cahier') return false;
-    if (concertState.isActive) {
-        const isLastPage = (partitionState.totalCount <= 1) || (partitionState.currentIndex >= partitionState.totalCount - 1);
-        const isFirstPage = (partitionState.currentIndex <= 0);
-        if (delta > 0 && isLastPage) {
-            return concertState.currentIndex < concertState.morceaux.length - 1;
-        }
-        if (delta < 0 && isFirstPage) {
-            return concertState.currentIndex > 0;
-        }
-        return true;
-    }
-    return partitionState.totalCount > 1;
+    syncScoreNavMachine();
+    return scoreNavMachine.canTurnPage(delta);
 }
 
 function capturerSnapshotPageCourante(startDragOffsetPx = 0) {
@@ -6305,7 +7170,9 @@ async function changerPartitionPage(delta, event, startDragOffsetPx = 0) {
     const container = document.getElementById('fullscreen-swipe-container');
     const vw = (container ? container.clientWidth : window.innerWidth) || window.innerWidth;
 
-    if (!peutChangerPartitionPage(delta)) {
+    const transition = scoreNavMachine ? (syncScoreNavMachine(), scoreNavMachine.turnPage(delta)) : null;
+
+    if (transition ? transition.action === 'noop' : !peutChangerPartitionPage(delta)) {
         if (concertState.isActive) {
             if (delta > 0) afficherToastConcert(t('concert.end_of_setlist'));
             else if (delta < 0) afficherToastConcert(t('concert.start_of_setlist'));
@@ -6326,6 +7193,11 @@ async function changerPartitionPage(delta, event, startDragOffsetPx = 0) {
 
     const animerSlideHorizontal = () => {
         if (!wrapper) return;
+        const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+        const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
+        if (prevCanvas) prevCanvas.style.display = 'none';
+        if (nextCanvas) nextCanvas.style.display = 'none';
+
         const enterStartX = (delta > 0 ? vw : -vw) + startDragOffsetPx;
         const exitEndX = delta > 0 ? -vw : vw;
 
@@ -6346,6 +7218,7 @@ async function changerPartitionPage(delta, event, startDragOffsetPx = 0) {
         wrapper.style.transform = 'translate3d(0px, 0px, 0)';
 
         _partitionPageTurnTimer = setTimeout(() => {
+            _partitionPageTurnTimer = null;
             if (snap) {
                 snap.style.display = 'none';
                 snap.style.transition = 'none';
@@ -6355,40 +7228,27 @@ async function changerPartitionPage(delta, event, startDragOffsetPx = 0) {
                 wrapper.style.transition = 'none';
                 wrapper.style.transform = 'none';
             }
-            _partitionPageTurnTimer = null;
+            positionnerCanvasVoisinsPdf();
         }, durationMs + 25);
     };
 
-    if (concertState.isActive) {
-        const isLastPage = (partitionState.totalCount <= 1) || (partitionState.currentIndex >= partitionState.totalCount - 1);
-        const isFirstPage = (partitionState.currentIndex <= 0);
-
-        if (delta > 0 && isLastPage) {
-            if (concertState.currentIndex < concertState.morceaux.length - 1) {
-                await chargerMorceauConcert(concertState.currentIndex + 1, 0);
-                animerSlideHorizontal();
-                const nextSong = concertState.morceaux[concertState.currentIndex];
-                afficherToastConcert(t('concert.tune_Step', { current: concertState.currentIndex + 1, total: concertState.morceaux.length, title: nextSong.titre }));
-                return;
-            }
+    if (transition && transition.action === 'song') {
+        await chargerMorceauConcert(transition.songIndex, transition.targetPage);
+        animerSlideHorizontal();
+        const activeSong = concertState.morceaux[concertState.currentIndex];
+        if (activeSong) {
+            afficherToastConcert(t('concert.tune_Step', { current: concertState.currentIndex + 1, total: concertState.morceaux.length, title: activeSong.titre }));
         }
-
-        if (delta < 0 && isFirstPage) {
-            if (concertState.currentIndex > 0) {
-                await chargerMorceauConcert(concertState.currentIndex - 1, 'last');
-                animerSlideHorizontal();
-                const prevSong = concertState.morceaux[concertState.currentIndex];
-                afficherToastConcert(t('concert.tune_Step', { current: concertState.currentIndex + 1, total: concertState.morceaux.length, title: prevSong.titre }));
-                return;
-            }
-        }
+        return;
     }
 
     if (partitionState.totalCount <= 1) return Promise.resolve();
 
-    let newIndex = partitionState.currentIndex + delta;
-    if (newIndex < 0) newIndex = partitionState.totalCount - 1;
-    if (newIndex >= partitionState.totalCount) newIndex = 0;
+    let newIndex = transition && transition.action === 'page'
+        ? transition.pageIndex
+        : (partitionState.currentIndex + delta);
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex >= partitionState.totalCount) newIndex = partitionState.totalCount - 1;
 
     partitionState.currentIndex = newIndex;
     fullscreenIndex = newIndex;
@@ -6533,6 +7393,7 @@ function fermerModalImage(forcerQuitter = false) {
         try { partitionState.renderTask.cancel(); } catch (e) { }
         partitionState.renderTask = null;
     }
+    annulerRendusVoisinsPdf();
     if (partitionState.pdfDoc) {
         try { partitionState.pdfDoc.destroy(); } catch (e) { }
         partitionState.pdfDoc = null;
@@ -6542,6 +7403,20 @@ function fermerModalImage(forcerQuitter = false) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         canvas.style.display = 'none';
+    }
+    const prevCanvas = document.getElementById('pdf-prerender-prev-canvas');
+    if (prevCanvas) {
+        const pctx = prevCanvas.getContext('2d');
+        if (pctx) pctx.clearRect(0, 0, prevCanvas.width, prevCanvas.height);
+        prevCanvas.style.display = 'none';
+        prevCanvas.style.transform = 'none';
+    }
+    const nextCanvas = document.getElementById('pdf-prerender-next-canvas');
+    if (nextCanvas) {
+        const nctx = nextCanvas.getContext('2d');
+        if (nctx) nctx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+        nextCanvas.style.display = 'none';
+        nextCanvas.style.transform = 'none';
     }
     const snap = document.getElementById('partition-page-snapshot');
     if (snap) {
@@ -6575,7 +7450,11 @@ function fermerModalImage(forcerQuitter = false) {
     partitionState.totalCount = 0;
     partitionState.currentIndex = 0;
     partitionState.sourceNom = '';
+    partitionState.renderedPageIndex = null;
+    partitionState.prevRenderedPageIndex = null;
+    partitionState.nextRenderedPageIndex = null;
     fullscreenIndex = 0;
+    syncScoreNavMachine();
 
     const pupitreEnCours = (typeof isPupitreActive !== 'undefined') ? isPupitreActive : false;
     const timerActif = (typeof activeTimer !== 'undefined' && activeTimer && activeTimer.index !== null && !activeTimer.isPaused);
@@ -7202,6 +8081,7 @@ function toggleModeAnnotation(forceState) {
         alignerAnnotationCanvas();
         redessinerAnnotations();
     }
+    syncScoreNavMachine();
 }
 
 function choisirOutilAnnotation(tool, garderPopoverOuvert = false) {
@@ -7218,6 +8098,7 @@ function choisirOutilAnnotation(tool, garderPopoverOuvert = false) {
     });
     const activeBtn = document.getElementById(`tool-${tool}`);
     if (activeBtn) activeBtn.classList.add('active');
+    syncScoreNavMachine();
 }
 
 function choisirCouleurAnnotation(color, el) {
@@ -7258,9 +8139,7 @@ function majAffichagePalmRejectionUI() {
 }
 
 function getCleAnnotationCourante() {
-    const src = partitionState.sourceNom || partitionState.titre || 'partition';
-    const cleanSrc = src.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-    return `annot_${cleanSrc}_p${partitionState.currentIndex}`;
+    return ScoreNavigation.getAnnotationKey(partitionState.sourceNom, partitionState.titre, partitionState.currentIndex);
 }
 
 async function chargerAnnotationsPageCourante() {
@@ -7613,7 +8492,8 @@ if (swipeContainer) {
     swipeContainer.style.touchAction = 'none';
 
     const onDragStart = (clientX, clientY, target) => {
-        if (annotationState.isEditing || partitionState.type === 'cahier') return false;
+        const navState = syncScoreNavMachine();
+        if ((navState && navState.isSwipeLocked) || annotationState.isEditing || partitionState.type === 'cahier') return false;
         if (target && (target.closest('button') || target.closest('.close-modal') || target.closest('#annotation-toolbar'))) return false;
 
         touchStartX = clientX;
@@ -7621,6 +8501,10 @@ if (swipeContainer) {
         touchStartTime = performance.now();
         currentDragDx = 0;
         isSwipingPartition = false;
+
+        if (partitionState.type === 'pdf') {
+            positionnerCanvasVoisinsPdf();
+        }
 
         const wrapper = document.getElementById('partition-canvas-wrapper');
         if (wrapper) {
@@ -7630,21 +8514,21 @@ if (swipeContainer) {
     };
 
     const onDragMove = (clientX, clientY) => {
-        if (annotationState.isEditing || partitionState.type === 'cahier') return;
         const dx = clientX - touchStartX;
         const dy = clientY - touchStartY;
+        const containerW = swipeContainer.clientWidth || window.innerWidth;
 
-        if (!isSwipingPartition) {
-            if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.15) {
-                isSwipingPartition = true;
-            } else {
-                return;
-            }
-        }
-
-        const delta = dx < 0 ? 1 : -1;
-        const canTurn = peutChangerPartitionPage(delta);
-        currentDragDx = canTurn ? dx : dx * 0.22; // Résistance élastique en bout de setlist ou page unique
+        syncScoreNavMachine();
+        const evalRes = scoreNavMachine.evaluateSwipe({
+            dx,
+            dy,
+            elapsedMs: Math.max(1, performance.now() - touchStartTime),
+            containerWidth: containerW,
+            alreadySwiping: isSwipingPartition
+        });
+        if (!evalRes.allowed || !evalRes.isHorizontalSwipe) return;
+        isSwipingPartition = true;
+        currentDragDx = evalRes.dragOffsetPx;
 
         const wrapper = document.getElementById('partition-canvas-wrapper');
         if (wrapper) {
@@ -7653,21 +8537,26 @@ if (swipeContainer) {
     };
 
     const onDragEnd = (clientX, clientY, target, event) => {
-        if (annotationState.isEditing || partitionState.type === 'cahier') return;
+        const navState = syncScoreNavMachine();
+        if (navState && navState.isSwipeLocked) return;
 
         const diffX = clientX - touchStartX;
         const diffY = clientY - touchStartY;
         const elapsed = Math.max(1, performance.now() - touchStartTime);
-        const velocityX = Math.abs(diffX) / elapsed; // px/ms
         const containerW = swipeContainer.clientWidth || window.innerWidth;
-        const SWIPE_THRESHOLD = Math.min(90, containerW * 0.16);
 
         if (isSwipingPartition) {
             isSwipingPartition = false;
-            const delta = diffX < 0 ? 1 : -1;
-            const shouldTurn = (Math.abs(diffX) > SWIPE_THRESHOLD || (Math.abs(diffX) > 28 && velocityX > 0.45)) && peutChangerPartitionPage(delta);
+            const evalRes = scoreNavMachine.evaluateSwipe({
+                dx: diffX,
+                dy: diffY,
+                elapsedMs: elapsed,
+                containerWidth: containerW,
+                alreadySwiping: true
+            });
+            const delta = evalRes.delta || (diffX < 0 ? 1 : -1);
 
-            if (shouldTurn) {
+            if (evalRes.shouldTurn) {
                 changerPartitionPage(delta, event, currentDragDx);
             } else {
                 if (concertState.isActive && Math.abs(diffX) > 45 && !peutChangerPartitionPage(delta)) {
@@ -7775,7 +8664,7 @@ window.addEventListener('resize', () => {
     if (modal && modal.style.display !== 'none') {
         clearTimeout(window._pdfResizeTimer);
         window._pdfResizeTimer = setTimeout(() => {
-            if (partitionState.type === 'pdf') afficherPagePdf(partitionState.currentIndex);
+            if (partitionState.type === 'pdf') afficherPagePdf(partitionState.currentIndex, { forceRender: true });
             alignerAnnotationCanvas();
             redessinerAnnotations();
         }, 150);
@@ -7861,8 +8750,13 @@ function demarrerCahier(type = 'simple') {
     if (imgEl) imgEl.style.display = 'none';
     const pdfEl = document.getElementById('pdf-render-canvas');
     if (pdfEl) pdfEl.style.display = 'none';
+    const prevEl = document.getElementById('pdf-prerender-prev-canvas');
+    if (prevEl) prevEl.style.display = 'none';
+    const nextEl = document.getElementById('pdf-prerender-next-canvas');
+    if (nextEl) nextEl.style.display = 'none';
     const leadSheetEl = document.getElementById('concert-lead-sheet');
     if (leadSheetEl) leadSheetEl.style.display = 'none';
+    syncScoreNavMachine();
 
     // Afficher et dessiner le canvas de portées
     const staffCanvas = document.getElementById('cahier-staff-canvas');
@@ -9780,13 +10674,13 @@ if (typeof window !== 'undefined') {
     window.demarrerImportTrieur = demarrerImportTrieur;
     window.choisirModeTrieur = choisirModeTrieur;
     window.selectChipPreparationTrieur = selectChipPreparationTrieur;
-    window.ignorerFichierTrieur = ignorerFichierTrieur;
-    window.validerCreationTrieur = validerCreationTrieur;
-    window.validerFusionTrieur = validerFusionTrieur;
-    window.annulerFusionTrieur = annulerFusionTrieur;
-    window.filtrerAutocompleteTrieur = filtrerAutocompleteTrieur;
-    window.fermerTrieur = fermerTrieur;
-    window.traiterInboxZip = traiterInboxZip;
+    if (typeof ignorerFichierTrieur !== 'undefined') window.ignorerFichierTrieur = ignorerFichierTrieur;
+    if (typeof validerCreationTrieur !== 'undefined') window.validerCreationTrieur = validerCreationTrieur;
+    if (typeof validerFusionTrieur !== 'undefined') window.validerFusionTrieur = validerFusionTrieur;
+    if (typeof annulerFusionTrieur !== 'undefined') window.annulerFusionTrieur = annulerFusionTrieur;
+    if (typeof filtrerAutocompleteTrieur !== 'undefined') window.filtrerAutocompleteTrieur = filtrerAutocompleteTrieur;
+    if (typeof fermerTrieur !== 'undefined') window.fermerTrieur = fermerTrieur;
+    if (typeof traiterInboxZip !== 'undefined') window.traiterInboxZip = traiterInboxZip;
 }
 
 // FIN DU FICHIER
