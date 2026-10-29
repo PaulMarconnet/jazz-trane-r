@@ -1464,12 +1464,14 @@ body.mode-pupitre .item-card { display: none !important; }
     align-items: center;
     justify-content: center;
     position: relative;
-    font-family: var(--font-body, 'DM Sans', -apple-system, sans-serif);
-    font-size: 52px;
+    font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 54px;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1;
     letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
     user-select: none;
 }
 .android-timer-time .timer-prefix {
@@ -1494,19 +1496,18 @@ body.mode-pupitre .item-card { display: none !important; }
 }
 .android-timer-time .timer-digit {
     display: inline-block;
-    width: 35px;
+    min-width: 1ch;
     text-align: center;
+    margin: 0 1px;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
 }
 .android-timer-time .timer-sep {
     display: inline-block;
-    width: 16px;
-    text-align: center;
-    margin: 0 4px;
+    margin: 0 6px;
     opacity: 0.85;
     position: relative;
-    top: -2px;
+    top: -3px;
 }
 .android-timer-eta { font-size: 14px; color: var(--text-muted); margin-top: 8px; display: flex; align-items: center; justify-content: center; }
 

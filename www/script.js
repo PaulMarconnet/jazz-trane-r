@@ -1385,7 +1385,13 @@ function afficherVue(nomVue) {
         document.getElementById('vue-pratique').classList.add('vue-active');
         if (btnPratique) btnPratique.classList.add('active');
         if (seanceEnCours && seanceEnCours.statut === 'en_cours') {
-            afficherSeancePratique();
+            const conteneur = document.getElementById('conteneur-items');
+            const estDejaRendu = conteneur && conteneur.dataset.seanceId === String(seanceEnCours.id) && conteneur.children.length > 0;
+            if (!estDejaRendu) {
+                afficherSeancePratique();
+            } else {
+                majAffichageDureeLive();
+            }
         }
     } else if (nomVue === 'creation') {
         document.getElementById('vue-creation').classList.add('vue-active');
@@ -3030,7 +3036,7 @@ async function chargerDerniereSeance() {
     }
 }
 
-function afficherSeancePratique() {
+function afficherSeancePratique(forcerRebuild = false) {
     if (!seanceEnCours) return;
     const [y, m, d] = seanceEnCours.date_seance.split('-');
     const locale = typeof getLocaleCode === 'function' ? getLocaleCode() : 'fr-FR';
@@ -3047,16 +3053,39 @@ function afficherSeancePratique() {
         }
     }
 
-    const conteneur = document.getElementById('conteneur-items'); conteneur.innerHTML = "";
-    const btnPause = document.getElementById('btn-pause-global');
-    btnPause.disabled = true; btnPause.innerHTML = svgPauseSquare; btnPause.className = 'btn-action btn-ghost-neutral btn-square';
+    const conteneur = document.getElementById('conteneur-items');
+    if (!forcerRebuild && conteneur && conteneur.dataset.seanceId === String(seanceEnCours.id) && conteneur.children.length > 0) {
+        majAffichageDureeLive();
+        return;
+    }
 
-    if (activeTimer.interval) clearInterval(activeTimer.interval);
-    activeTimer.index = null; activeTimer.isPaused = false; stopMetronome();
+    conteneur.innerHTML = "";
+    conteneur.dataset.seanceId = String(seanceEnCours.id);
+
+    const aTimerActif = activeTimer.index !== null;
+    const activeIndex = activeTimer.index;
+    const activeRemaining = activeTimer.remainingSecsAtPause;
+    const activeIsPaused = activeTimer.isPaused;
+    const activeIsOvertime = activeTimer.isOvertime;
+
+    if (!aTimerActif) {
+        if (activeTimer.interval) clearInterval(activeTimer.interval);
+        activeTimer.index = null; activeTimer.isPaused = false; stopMetronome();
+    }
+
+    const btnPause = document.getElementById('btn-pause-global');
+    if (!aTimerActif) {
+        btnPause.disabled = true; btnPause.innerHTML = svgPauseSquare; btnPause.className = 'btn-action btn-ghost-neutral btn-square';
+    } else {
+        btnPause.disabled = false;
+        btnPause.innerHTML = activeIsPaused ? svgPlaySquare : svgPauseSquare;
+        btnPause.className = activeIsPaused ? 'btn-action btn-ghost-amber btn-square' : 'btn-action btn-ghost-blue btn-square';
+    }
 
     seanceEnCours.items.forEach((item, index) => {
+        const estActif = (aTimerActif && activeIndex === index);
         const div = document.createElement('div');
-        div.id = `card-${index}`; div.className = `item-card ${item.fait ? 'done' : ''}`;
+        div.id = `card-${index}`; div.className = `item-card ${item.fait ? 'done' : ''} ${estActif ? 'active' : ''}`;
         div.onclick = () => gererClicCarte(index);
 
         let badgesHtml = `<div class="badges-container">`;
@@ -3072,6 +3101,21 @@ function afficherSeancePratique() {
         badgesHtml += `</div>`;
 
         let chronoAffiche = `${item.temps_prevu} min`;
+        let badgeTempsClass = 'badge-temps';
+        if (estActif) {
+            const tFormate = formaterTemps(activeRemaining);
+            if (activeIsOvertime) {
+                badgeTempsClass = 'badge-temps overtime';
+                chronoAffiche = activeIsPaused ? t('immersive.paused_overtime', { time: tFormate }) : `+ ${tFormate}`;
+            } else if (activeIsPaused) {
+                badgeTempsClass = 'badge-temps paused';
+                chronoAffiche = t('immersive.paused_time', { time: tFormate });
+            } else {
+                badgeTempsClass = 'badge-temps running';
+                chronoAffiche = `${tFormate}`;
+            }
+        }
+
         div.innerHTML = `
             <div class="item-header">
                 <div style="display: flex; align-items: center;">
@@ -3079,7 +3123,7 @@ function afficherSeancePratique() {
                     <span class="categorie">${item.categorie}</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <span class="badge-temps" id="timer-display-${index}">${chronoAffiche}</span>
+                    <span class="${badgeTempsClass}" id="timer-display-${index}">${chronoAffiche}</span>
                     <div class="exercise-check-indicator ${item.fait ? 'checked' : ''}" id="check-exo-${index}">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.8"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
@@ -3518,6 +3562,8 @@ function terminerEtReinitialiser(statut) {
     }
     const oldId = seanceEnCours ? seanceEnCours.id : null;
     seanceEnCours = null;
+    const conteneurItems = document.getElementById('conteneur-items');
+    if (conteneurItems) conteneurItems.dataset.seanceId = '';
     if (oldId) nettoyerStockageSeance(oldId);
     licksPratiquesSession.clear();
 
@@ -3770,7 +3816,7 @@ async function sauvegarderSeance() {
         const cree = await apiFetch(`/seances`, { method: 'POST', body: JSON.stringify(nouvelleSeance) });
         seanceEnCours = cree;
         reinitialiserPomodoro();
-        afficherSeancePratique();
+        afficherSeancePratique(true);
         afficherVue('pratique');
     } catch (e) {
         console.error("Erreur sauvegarde séance :", e);
