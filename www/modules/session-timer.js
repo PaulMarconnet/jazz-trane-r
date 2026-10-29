@@ -45,9 +45,20 @@
         const parts = clean.split(':');
         if (parts.length === 2) {
             const rawMin = parts[0].trim();
-            const min = rawMin.length === 1 ? ('0' + rawMin) : rawMin;
-            const sec = parts[1].trim().padStart(2, '0');
-            return `${prefix}<span class="timer-digits timer-min">${min}</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">${sec}</span>`;
+            const minStr = rawMin.length === 1 ? ('0' + rawMin) : rawMin;
+            const secStr = parts[1].trim().padStart(2, '0');
+
+            let minDigitsHtml = '';
+            for (let i = 0; i < minStr.length; i++) {
+                minDigitsHtml += `<span class="timer-digit">${minStr[i]}</span>`;
+            }
+
+            let secDigitsHtml = '';
+            for (let i = 0; i < secStr.length; i++) {
+                secDigitsHtml += `<span class="timer-digit">${secStr[i]}</span>`;
+            }
+
+            return `${prefix}<span class="timer-col timer-min">${minDigitsHtml}</span><span class="timer-sep">:</span><span class="timer-col timer-sec">${secDigitsHtml}</span>`;
         }
         return timeStr;
     }

@@ -281,17 +281,17 @@ describe('session-timer — Seam 4 : Formule unique de durée réelle & Horloge 
     });
 
     it('génère un balisage HTML stable pour le chronomètre et l\'horloge discrète (zéro saut du séparateur)', () => {
-        // Chronomètre standard 2 chiffres
+        // Chronomètre standard 2 chiffres avec cellules tabulaires individuelles
         const htmlStd = SessionTimer.formatTimeHtml('05:00');
-        expect(htmlStd).toBe('<span class="timer-digits timer-min">05</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">00</span>');
+        expect(htmlStd).toBe('<span class="timer-col timer-min"><span class="timer-digit">0</span><span class="timer-digit">5</span></span><span class="timer-sep">:</span><span class="timer-col timer-sec"><span class="timer-digit">0</span><span class="timer-digit">0</span></span>');
 
         // Chronomètre avec 1 chiffre de minute (normalisé à 2 chiffres pour éviter les sauts)
         const htmlSingleMin = SessionTimer.formatTimeHtml('5:00');
-        expect(htmlSingleMin).toBe('<span class="timer-digits timer-min">05</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">00</span>');
+        expect(htmlSingleMin).toBe('<span class="timer-col timer-min"><span class="timer-digit">0</span><span class="timer-digit">5</span></span><span class="timer-sep">:</span><span class="timer-col timer-sec"><span class="timer-digit">0</span><span class="timer-digit">0</span></span>');
 
         // Chronomètre en overtime avec préfixe +
         const htmlOvertime = SessionTimer.formatTimeHtml('+ 01:23');
-        expect(htmlOvertime).toBe('<span class="timer-prefix">+</span><span class="timer-digits timer-min">01</span><span class="timer-sep">:</span><span class="timer-digits timer-sec">23</span>');
+        expect(htmlOvertime).toBe('<span class="timer-prefix">+</span><span class="timer-col timer-min"><span class="timer-digit">0</span><span class="timer-digit">1</span></span><span class="timer-sep">:</span><span class="timer-col timer-sec"><span class="timer-digit">2</span><span class="timer-digit">3</span></span>');
 
         // Horloge discrète 24h
         const htmlClock = SessionTimer.formatClockHtml('10:04');

@@ -3922,7 +3922,7 @@ function renderHistoriqueListe() {
                         <div><span class="categorie" style="color: var(--text-primary);">${dateFormatee}</span>${s.tonalite_du_jour ? `<span style="color: var(--text-muted); margin-left: 8px; font-size: 14px;">${formatTonalite(s.tonalite_du_jour)}</span>` : ''}</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:12px;">
-                        <span class="badge-temps" style="color: var(--text-primary); border-color: var(--border-color); background: transparent; margin:0;">${dureeFormatee}</span>
+                        <span class="badge-temps" style="color: var(--text-muted); border-color: var(--border-color); background: transparent; margin:0;">${dureeFormatee}</span>
                         <button class="btn-action btn-ghost-red btn-square" onclick="supprimerSeance(${s.id})" title="${t('common.delete')}" style="height: 28px; width: 28px;">${svgTrash}</button>
                     </div>
                 </div>
