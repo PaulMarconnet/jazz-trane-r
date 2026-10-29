@@ -274,6 +274,11 @@ describe('session-timer — Seam 4 : Formule unique de durée réelle & Horloge 
         const d3 = new Date(2026, 9, 29, 0, 0, 0); // 00:00
         expect(SessionTimer.formatClock24h(d3)).toBe('00:00');
 
+        // ETA en format HH:MM (cohérence avec l'horloge discrète)
+        const tBase = new Date(2026, 9, 29, 10, 51, 0); // 10:51
+        expect(SessionTimer.calculateETA(25 * 60, tBase)).toBe('11:16'); // 10:51 + 25 min = 11:16
+        expect(SessionTimer.calculateETA(90, tBase)).toBe('10:52');      // 10:51 + 1m30s = 10:52:30 -> 10:52
+
         // Formats de durées
         expect(SessionTimer.formaterTemps(125)).toBe('2:05');
         expect(SessionTimer.formaterDureeSeance(75)).toBe('01:15');

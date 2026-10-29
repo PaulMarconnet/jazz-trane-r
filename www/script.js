@@ -5170,12 +5170,14 @@ function toggleModePupitre(actif) {
 function filtrerImmersif(val) { immersiveSearchQuery = val.trim().toLowerCase(); renderShuffleCard(); }
 
 function calculerETA(secondesRestantes) {
-    const now = new Date();
-    now.setSeconds(now.getSeconds() + secondesRestantes);
-    if (typeof getCurrentLang === 'function' && getCurrentLang() === 'en') {
-        return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.calculateETA === 'function') {
+        return window.SessionTimer.calculateETA(secondesRestantes);
     }
-    return now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
+    const targetDate = new Date();
+    targetDate.setSeconds(targetDate.getSeconds() + Math.max(0, Math.round(secondesRestantes || 0)));
+    const hours = targetDate.getHours().toString().padStart(2, '0');
+    const minutes = targetDate.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
 }
 
 async function terminerExerciceActuel() {

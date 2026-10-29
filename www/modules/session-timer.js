@@ -34,6 +34,14 @@
         return `${hours}:${minutes}`;
     }
 
+    function calculateETA(remainingSecs, nowInput) {
+        const baseMs = (nowInput instanceof Date)
+            ? nowInput.getTime()
+            : (typeof nowInput === 'number' ? nowInput : Date.now());
+        const targetDate = new Date(baseMs + Math.max(0, Math.round(remainingSecs || 0)) * 1000);
+        return formatClock24h(targetDate);
+    }
+
     function formatTimeHtml(timeStr) {
         if (!timeStr || typeof timeStr !== 'string') return '';
         let prefix = '';
@@ -577,6 +585,7 @@
         formaterTemps,
         formaterDureeSeance,
         formatClock24h,
+        calculateETA,
         formatTimeHtml,
         formatClockHtml
     };
