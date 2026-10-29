@@ -1020,7 +1020,7 @@ input[type="file"].file-input::file-selector-button:hover { background: var(--bt
 .tonalite-display { text-align: center; font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 8px 0 32px 0; }
 
 .item-card {
-    background-color: var(--card-bg-elevated);
+    background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--card-radius);
     padding: 16px;
@@ -1494,7 +1494,7 @@ body.mode-pupitre .item-card { display: none !important; }
 }
 .android-timer-time .timer-digit {
     display: inline-block;
-    width: 30px;
+    width: 35px;
     text-align: center;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
