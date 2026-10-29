@@ -1431,6 +1431,21 @@ body.mode-pupitre .item-card { display: none !important; }
 .android-timer-time { font-size: 52px; font-weight: 700; color: var(--text-primary); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
 .android-timer-eta { font-size: 14px; color: var(--text-muted); margin-top: 8px; display: flex; align-items: center; justify-content: center; }
 
+/* Horloge discrète 24h du Mode Immersif */
+.immersive-discreet-clock {
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    opacity: 0.65;
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+    margin: 0;
+    line-height: 1;
+}
+
 /* --- SWITCH MODE & LISTE --- */
 .pupitre-mode-switch {
     display: flex; background: var(--card-bg); border: 1px solid var(--border-color);

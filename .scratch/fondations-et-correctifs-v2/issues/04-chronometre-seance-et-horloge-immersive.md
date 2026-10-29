@@ -6,8 +6,8 @@
 
 **Recommended model:** **Gemini 4 Argon (Medium)** — Conception d'une machine à états temporelle déterministe remplaçant 5 états globaux concurrents.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Le module `session-timer` est testé de façon déterministe sous `vitest` (sans `setTimeout` réel, par injection de timestamps `now`) sur : l'exclusivité d'un seul exercice actif à la fois, le passage en `overtime`, la suspension automatique de l'exercice et du cumul de séance pendant une Pause café, le déclenchement Pomodoro, et la clôture automatique AFK au bout de 60 minutes sans interaction en `overtime` (avec soustraction exacte des 3 600 secondes d'inactivité).
-- [ ] La **Vue Séance** et le **Mode Immersif** délèguent leurs transitions temporelles et le calcul de la durée réelle au module `session-timer`.
-- [ ] En **Mode Immersif** uniquement (ni dans la **Vue Séance**, ni dans le **Lecteur de Partition**), l'heure courante au format 24h (`HH:MM`) s'affiche centrée tout en haut en très petit et en couleur secondaire atténuée, mise à jour automatiquement chaque minute.
+- [x] Le module `session-timer` est testé de façon déterministe sous `vitest` (sans `setTimeout` réel, par injection de timestamps `now`) sur : l'exclusivité d'un seul exercice actif à la fois, le passage en `overtime`, la suspension automatique de l'exercice et du cumul de séance pendant une Pause café, le déclenchement Pomodoro, et la clôture automatique AFK au bout de 60 minutes sans interaction en `overtime` (avec soustraction exacte des 3 600 secondes d'inactivité).
+- [x] La **Vue Séance** et le **Mode Immersif** délèguent leurs transitions temporelles et le calcul de la durée réelle au module `session-timer`.
+- [x] En **Mode Immersif** uniquement (ni dans la **Vue Séance**, ni dans le **Lecteur de Partition**), l'heure courante au format 24h (`HH:MM`) s'affiche centrée tout en haut en très petit et en couleur secondaire atténuée, mise à jour automatiquement chaque minute.

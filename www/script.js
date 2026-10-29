@@ -458,6 +458,9 @@ window.addEventListener('touchend', function (e) {
 const AFK_LIMIT_SECONDS = 3600; // 1 heure d'inactivité
 
 function formaterDureeSeance(secondes) {
+    if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formaterDureeSeance === 'function') {
+        return window.SessionTimer.formaterDureeSeance(secondes);
+    }
     const s = Math.max(0, Math.floor(secondes));
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
@@ -469,6 +472,9 @@ function formaterDureeSeance(secondes) {
 }
 
 function calculerDureeReelleSeance(seance = seanceEnCours) {
+    if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.calculateSessionRealDuration === 'function') {
+        return window.SessionTimer.calculateSessionRealDuration(seance);
+    }
     if (!seance || !seance.timestamp_debut) return 0;
     const now = Date.now();
     let pauseMs = Number(seance.temps_pause_cumule_ms || 0);
@@ -721,6 +727,9 @@ function formatTonalite(tonalite) {
     return res;
 }
 function formaterTemps(secondes) {
+    if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formaterTemps === 'function') {
+        return window.SessionTimer.formaterTemps(secondes);
+    }
     if (!Number.isFinite(secondes) || isNaN(secondes) || secondes < 0) return "0:00";
     const sec = Math.floor(secondes);
     return `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, '0')}`;
@@ -3766,7 +3775,9 @@ async function chargerHistorique() {
         historiquesTerminees.forEach(s => {
             if (s.tonalite_du_jour) { const tRelative = getTonaliteMajeureRelative(s.tonalite_du_jour); tonsCount[tRelative] = (tonsCount[tRelative] || 0) + 1; }
             let tempsSeanceMins = 0;
-            if (s.duree_reelle !== undefined && s.duree_reelle !== null && Number(s.duree_reelle) > 0) {
+            if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.calculateSessionRealDuration === 'function') {
+                tempsSeanceMins = Math.round(window.SessionTimer.calculateSessionRealDuration(s) / 60);
+            } else if (s.duree_reelle !== undefined && s.duree_reelle !== null && Number(s.duree_reelle) > 0) {
                 tempsSeanceMins = Math.round(Number(s.duree_reelle) / 60);
             } else if (s.items && Array.isArray(s.items)) {
                 s.items.forEach(item => {
@@ -3893,7 +3904,13 @@ function changerPeriodeGraph(periode) {
         if (!s.date_seance) return;
         const dateSeance = new Date(s.date_seance);
         if (dateSeance >= startDate) {
-            const tempsSeanceMins = Math.round((s.duree_reelle || 0) / 60); totalMinutes += tempsSeanceMins;
+            let tempsSeanceMins = 0;
+            if (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.calculateSessionRealDuration === 'function') {
+                tempsSeanceMins = Math.round(window.SessionTimer.calculateSessionRealDuration(s) / 60);
+            } else {
+                tempsSeanceMins = Math.round((s.duree_reelle || 0) / 60);
+            }
+            totalMinutes += tempsSeanceMins;
             if (s.items && Array.isArray(s.items)) {
                 s.items.forEach(item => {
                     if (item.fait) {
@@ -4963,6 +4980,8 @@ async function genererSmartShuffle(categorie, sousCategoriesArray) {
     return [];
 }
 
+let immersiveClockInterval = null;
+
 function toggleModePupitre(actif) {
     isPupitreActive = actif;
     const container = document.getElementById('shuffle-container');
@@ -4972,27 +4991,35 @@ function toggleModePupitre(actif) {
         immersiveSearchQuery = '';
         activerWakeLock();
 
+        if (immersiveClockInterval) clearInterval(immersiveClockInterval);
+        immersiveClockInterval = setInterval(rafraichirHorlogeImmersive, 1000);
+
         if (container) {
             container.style.display = 'block';
             container.innerHTML = `
-                <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 24px; gap: 8px;">
-                    <button id="btn-pupitre-dictaphone" class="btn-action btn-ghost-neutral btn-square" onclick="ouvrirDictaphoneDepuisImmersif()" title="${t('dictaphone.rec_idle_btn')}" style="border: 1px solid var(--border-color);">
-                        <svg viewBox="0 0 24 24" style="width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-                    </button>
-                    <button id="btn-pupitre-audio" class="btn-action btn-ghost-neutral btn-square" onclick="ouvrirAudioMorceauActuelImmersif()" title="${t('audio.title')}" style="border: 1px solid var(--border-color); display: none;">
-                        <svg viewBox="0 0 24 24" style="width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                    </button>
-                    <button id="btn-pupitre-metronome" class="btn-action btn-ghost-neutral btn-square ${metronome.isPlaying ? 'playing' : ''}" onclick="ouvrirModalMetronome()" title="${metronome.isPlaying ? t('metronome.active_title', { bpm: metronome.tempo }) : t('metronome.title')}" style="border: 1px solid var(--border-color);">
-                        <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
-                            <path d="M12 11.4V9.1"/>
-                            <path d="m12 17 6.59-6.59"/>
-                            <path d="m15.05 5.7-.218-.691a3 3 0 0 0-5.663 0L4.418 19.695A1 1 0 0 0 5.37 21h13.253a1 1 0 0 0 .951-1.31L18.45 16.2"/>
-                            <circle cx="20" cy="9" r="2"/>
-                        </svg>
-                    </button>
-                    <button class="btn-action btn-ghost-neutral btn-square" onclick="toggleModePupitre(false)" title="${t('immersive.exit_title')}" style="border: 1px solid var(--border-color);">
-                        <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>
-                    </button>
+                <div style="position: relative; display: flex; justify-content: flex-end; align-items: center; margin-bottom: 24px; min-height: 36px;">
+                    <div style="position: absolute; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none;">
+                        <span id="immersive-discreet-clock" class="immersive-discreet-clock" aria-label="Heure courante">--:--</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; z-index: 2;">
+                        <button id="btn-pupitre-dictaphone" class="btn-action btn-ghost-neutral btn-square" onclick="ouvrirDictaphoneDepuisImmersif()" title="${t('dictaphone.rec_idle_btn')}" style="border: 1px solid var(--border-color);">
+                            <svg viewBox="0 0 24 24" style="width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                        </button>
+                        <button id="btn-pupitre-audio" class="btn-action btn-ghost-neutral btn-square" onclick="ouvrirAudioMorceauActuelImmersif()" title="${t('audio.title')}" style="border: 1px solid var(--border-color); display: none;">
+                            <svg viewBox="0 0 24 24" style="width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                        </button>
+                        <button id="btn-pupitre-metronome" class="btn-action btn-ghost-neutral btn-square ${metronome.isPlaying ? 'playing' : ''}" onclick="ouvrirModalMetronome()" title="${metronome.isPlaying ? t('metronome.active_title', { bpm: metronome.tempo }) : t('metronome.title')}" style="border: 1px solid var(--border-color);">
+                            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
+                                <path d="M12 11.4V9.1"/>
+                                <path d="m12 17 6.59-6.59"/>
+                                <path d="m15.05 5.7-.218-.691a3 3 0 0 0-5.663 0L4.418 19.695A1 1 0 0 0 5.37 21h13.253a1 1 0 0 0 .951-1.31L18.45 16.2"/>
+                                <circle cx="20" cy="9" r="2"/>
+                            </svg>
+                        </button>
+                        <button class="btn-action btn-ghost-neutral btn-square" onclick="toggleModePupitre(false)" title="${t('immersive.exit_title')}" style="border: 1px solid var(--border-color);">
+                            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div id="immersif-infos" style="text-align: center; margin-bottom: 32px;"></div>
                 <div id="immersif-timer"></div>
@@ -5014,6 +5041,10 @@ function toggleModePupitre(actif) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
         document.body.classList.remove('mode-pupitre');
+        if (immersiveClockInterval) {
+            clearInterval(immersiveClockInterval);
+            immersiveClockInterval = null;
+        }
         if (typeof fermerModalMetronome === 'function') fermerModalMetronome();
         if (typeof arreterMetronome === 'function' && metronome.isPlaying) arreterMetronome();
         if (container) { container.innerHTML = ""; container.style.display = 'none'; }
@@ -5163,6 +5194,15 @@ async function toggleFavoriImmersif(id, event) {
     await toggleFavori(id);
 }
 
+function rafraichirHorlogeImmersive() {
+    const clockEl = document.getElementById('immersive-discreet-clock');
+    if (clockEl) {
+        clockEl.textContent = (typeof window !== 'undefined' && window.SessionTimer && typeof window.SessionTimer.formatClock24h === 'function')
+            ? window.SessionTimer.formatClock24h()
+            : (new Date().getHours().toString().padStart(2, '0') + ':' + new Date().getMinutes().toString().padStart(2, '0'));
+    }
+}
+
 function majAffichageChrono(index, secondesAffichees) {
     const display = document.getElementById(`timer-display-${index}`); const tFormate = formaterTemps(secondesAffichees);
     if (display) {
@@ -5173,6 +5213,7 @@ function majAffichageChrono(index, secondesAffichees) {
     if (isPupitreActive && activeTimer.index === index) {
         const timeText = document.getElementById('android-timer-time'); const circle = document.getElementById('android-timer-circle');
         const etaText = document.getElementById('android-timer-eta-text'); const btnPause = document.getElementById('btn-immersif-pause');
+        rafraichirHorlogeImmersive();
         if (timeText) timeText.textContent = tFormate;
         if (etaText) etaText.textContent = activeTimer.isOvertime ? "--:--" : calculerETA(secondesAffichees);
         if (circle) {
@@ -5210,6 +5251,8 @@ function renderShuffleCard() {
     }
 
     infosContainer.innerHTML = `<div style="display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap;">${badgesHtml}</div>${texteAffiche ? `<div style="font-size: 16px; color: var(--text-primary); margin-top: 16px; font-weight: 500;">${texteAffiche}</div>` : ''}`;
+
+    rafraichirHorlogeImmersive();
 
     let isCurrentlyPaused = activeTimer.index !== null && activeTimer.isPaused;
     let timerClass = '';
