@@ -19,7 +19,7 @@
             document.documentElement.setAttribute('data-theme', t);
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=51">
+    <link rel="stylesheet" href="style.css?v=52">
     <script src="libs/Sortable.min.js"></script>
     <script src="libs/chart.min.js"></script>
     <script src="libs/jszip.min.js"></script>
@@ -1432,18 +1432,15 @@
                     Personnalisez les thèmes sonores des notifications et le clic du métronome.
                 </p>
                 <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <!-- Interrupteur Notifications Minuteur -->
+                    <!-- Interrupteur Notifications Système (juste le titre) -->
                     <div class="modal-cadre" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <label id="label-settings-notif-systeme" style="display: block; font-size: 13px; font-weight: 500;">Notifications de minuteur</label>
-                            <span id="desc-settings-notif-systeme" style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;">Alertes système en arrière-plan à la fin d'un exercice ou d'une pause</span>
-                        </div>
-                        <div id="btn-toggle-notifications-systeme" class="switch on" role="switch" aria-checked="true" onclick="toggleNotificationsSysteme()" title="Activer / désactiver les notifications de minuteur"></div>
+                        <label id="label-settings-notif-systeme" style="font-size: 13px; font-weight: 500; margin: 0;">Notifications système</label>
+                        <div id="btn-toggle-notifications-systeme" class="switch on" role="switch" aria-checked="true" onclick="toggleNotificationsSysteme()" title="Activer / désactiver les notifications système"></div>
                     </div>
 
-                    <!-- Thème notifications -->
+                    <!-- Notifications de fin d'exercice -->
                     <div class="modal-cadre" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                        <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Thème sonore</label>
+                        <label id="label-settings-audio-theme" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Notifications de fin d'exercice</label>
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             <select id="select-settings-audio-theme" style="flex: 1; min-width: 180px; height: 34px;" onchange="sauvegarderParametresAudio()">
                                 <option value="jazz" selected>8-bit Jazz</option>
@@ -1457,18 +1454,9 @@
                         </div>
                     </div>
 
-                    <!-- Volume -->
+                    <!-- Métronome -->
                     <div class="modal-cadre" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                            <label style="font-size: 13px; font-weight: 500;">Volume général</label>
-                            <span id="label-settings-audio-volume" style="font-size: 13px; color: var(--accent-amber); font-weight: 600;">80%</span>
-                        </div>
-                        <input type="range" id="input-settings-audio-volume" min="0" max="100" value="80" style="width: 100%;" oninput="mettreAJourVolumeAudio(this.value)">
-                    </div>
-
-                    <!-- Thème métronome -->
-                    <div class="modal-cadre" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                        <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Métronome</label>
+                        <label id="label-settings-metronome-theme" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Métronome</label>
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             <select id="select-settings-metronome-theme" style="flex: 1; min-width: 180px; height: 34px;" onchange="sauvegarderParametresAudio()">
                                 <option value="bois" selected>Bois</option>
@@ -1479,6 +1467,15 @@
                                 <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin: 0;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Volume général (passé tout en bas) -->
+                    <div class="modal-cadre" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <label id="label-settings-audio-volume-title" style="font-size: 13px; font-weight: 500;">Volume général</label>
+                            <span id="label-settings-audio-volume" style="font-size: 13px; color: var(--accent-amber); font-weight: 600;">80%</span>
+                        </div>
+                        <input type="range" id="input-settings-audio-volume" min="0" max="100" value="80" style="width: 100%;" oninput="mettreAJourVolumeAudio(this.value)">
                     </div>
                 </div>
             </div>
@@ -2097,14 +2094,14 @@
         </div>
     </div>
 
-    <script src="i18n.js?v=51"></script>
-    <script src="modules/library-domain.js?v=51"></script>
-    <script src="modules/session-timer.js?v=51"></script>
-    <script src="modules/history-analytics.js?v=51"></script>
-    <script src="modules/score-navigation.js?v=51"></script>
-    <script src="modules/storage-repo.js?v=51"></script>
-    <script src="modules/system-host.js?v=51"></script>
-    <script src="script.js?v=51"></script>
+    <script src="i18n.js?v=52"></script>
+    <script src="modules/library-domain.js?v=52"></script>
+    <script src="modules/session-timer.js?v=52"></script>
+    <script src="modules/history-analytics.js?v=52"></script>
+    <script src="modules/score-navigation.js?v=52"></script>
+    <script src="modules/storage-repo.js?v=52"></script>
+    <script src="modules/system-host.js?v=52"></script>
+    <script src="script.js?v=52"></script>
 </body>
 
 </html>

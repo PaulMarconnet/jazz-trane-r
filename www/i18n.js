@@ -1,4 +1,4 @@
-// =========================================================================
+﻿// =========================================================================
 // MOTEUR D'INTERNATIONALISATION (FR / EN) — JAZZ TRANE'R
 // Terminologie authentique Jazz & Music Education (Berklee / Jazz Lesson Videos / iReal Pro)
 // =========================================================================
@@ -453,7 +453,7 @@ const I18N_DICT = {
         "dictaphone.mic_permission_title": "Autorisation microphone requise",
         "dictaphone.mic_permission_desc": "L'accès au microphone est nécessaire pour enregistrer vos prises dans le Dictaphone. Vous avez refusé cette autorisation dans les paramètres de votre appareil.",
         "dictaphone.open_settings_btn": "Ouvrir les paramètres Android",
-        "settings.notif_system_label": "Notifications système de minuteur",
+        "settings.notif_system_label": "Notifications système",
         "settings.notif_system_desc": "Alerte silencieuse au premier plan et notification dédiée en arrière-plan à la fin d'un minuteur",
 
         // Paramètres
@@ -487,7 +487,7 @@ const I18N_DICT = {
         "settings.pomodoro_work_label": "Durée de travail",
         "settings.pomodoro_break_label": "Durée de la pause",
         "settings.audio_intro": "Personnalisez les thèmes sonores des notifications et le clic du métronome.",
-        "settings.audio_theme_label": "Thème sonore",
+        "settings.audio_theme_label": "Notifications de fin d'exercice",
         "settings.sound_jazz": "8-bit Jazz",
         "settings.sound_classic": "Classique",
         "settings.sound_zen": "Zen",
@@ -1077,7 +1077,7 @@ const I18N_DICT = {
         "dictaphone.mic_permission_title": "Microphone Permission Required",
         "dictaphone.mic_permission_desc": "Microphone access is required to record takes with the Dictaphone. You have permanently denied this permission in your device settings.",
         "dictaphone.open_settings_btn": "Open Android Settings",
-        "settings.notif_system_label": "System timer notifications",
+        "settings.notif_system_label": "System notifications",
         "settings.notif_system_desc": "Silent foreground alert and dedicated background notification when a timer ends",
 
         // Settings
@@ -1111,7 +1111,7 @@ const I18N_DICT = {
         "settings.pomodoro_work_label": "Work Interval",
         "settings.pomodoro_break_label": "Break Duration",
         "settings.audio_intro": "Customize timer alert sounds and metronome click tone.",
-        "settings.audio_theme_label": "Timer Alert Sound",
+        "settings.audio_theme_label": "Exercise end notifications",
         "settings.sound_jazz": "8-bit Jazz",
         "settings.sound_classic": "Classic Arpeggio",
         "settings.sound_zen": "Zen Bowl",
@@ -1642,11 +1642,11 @@ function appliquerTraductionsDOM() {
     if (audioPane) {
         const p = audioPane.querySelector(':scope > p');
         if (p) p.textContent = t('settings.audio_intro');
-        const lbls = audioPane.querySelectorAll('label');
-        if (lbls[0]) lbls[0].textContent = t('settings.audio_theme_label');
-        if (lbls[1]) lbls[1].textContent = t('settings.master_volume_label');
-        if (lbls[2]) lbls[2].textContent = t('settings.metro_sound_label');
     }
+    setTxt('#label-settings-notif-systeme', 'settings.notif_system_label');
+    setTxt('#label-settings-audio-theme', 'settings.audio_theme_label');
+    setTxt('#label-settings-metronome-theme', 'settings.metro_sound_label');
+    setTxt('#label-settings-audio-volume-title', 'settings.master_volume_label');
     setTxt('#select-settings-audio-theme option[value="jazz"]', 'settings.sound_jazz');
     setTxt('#select-settings-audio-theme option[value="arpege"]', 'settings.sound_classic');
     setTxt('#select-settings-audio-theme option[value="zen"]', 'settings.sound_zen');
@@ -1656,9 +1656,7 @@ function appliquerTraductionsDOM() {
     setTxt('#select-settings-metronome-theme option[value="clic"]', 'settings.metro_click');
     setTxt('#select-settings-metronome-theme option[value="bip"]', 'settings.metro_beep');
     setTitle('button[onclick="testerSonMetronome()"]', 'settings.test_metro_title');
-    setTxt('#label-settings-notif-systeme', 'settings.notif_system_label');
-    setTxt('#desc-settings-notif-systeme', 'settings.notif_system_desc');
-    setTxt('#modal-mic-permission-title', 'dictaphone.mic_permission_title');
+        setTxt('#modal-mic-permission-title', 'dictaphone.mic_permission_title');
     setTxt('#modal-mic-permission-desc', 'dictaphone.mic_permission_desc');
     setTxt('#btn-ouvrir-parametres-android', 'dictaphone.open_settings_btn');
 
