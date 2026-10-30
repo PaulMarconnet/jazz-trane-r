@@ -76,6 +76,8 @@ describe('system-host : sauvegarde et micro', () => {
         const { host, calls } = setup();
         await host.saveBackupFile('a.json', 'blob', 'application/json');
         expect(calls.saved[0]).toEqual({ name: 'a.json', blob: 'blob', mime: 'application/json' });
+        await host.saveBackupFile('b.zip', 'blob2', 'application/zip', { handle: 'mockHandle' });
+        expect(calls.saved[1]).toEqual({ name: 'b.zip', blob: 'blob2', mime: 'application/zip', handle: 'mockHandle' });
     });
 
     it('micro : accorde / refuse / refus definitif', async () => {

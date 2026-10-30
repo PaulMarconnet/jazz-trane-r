@@ -77,8 +77,8 @@
             }
         }
 
-        async function saveBackupFile(name, blob, mime) {
-            return adapter.saveFile({ name, blob, mime });
+        async function saveBackupFile(name, blob, mime, options) {
+            return adapter.saveFile({ name, blob, mime, ...(options || {}) });
         }
 
         /** 'granted' | 'denied' | 'permanently_denied' */

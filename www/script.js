@@ -332,7 +332,17 @@ function getSystemHost() {
                 } catch (e) { }
             }
         },
-        saveFile: async ({ name, blob, mime }) => {
+        saveFile: async ({ name, blob, mime, handle }) => {
+            if (handle && typeof handle.createWritable === 'function') {
+                try {
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return true;
+                } catch (err) {
+                    console.warn("Écriture via FileSystemFileHandle a échoué, repli :", err);
+                }
+            }
             return telechargerFichierSysteme(blob, name, mime);
         },
         checkMicrophone: async () => {
@@ -10386,6 +10396,26 @@ async function exporterBackupJson() {
     const btn = document.getElementById('btn-export-json');
     const msg = document.getElementById('backup-status-msg');
     const originalText = btn ? btn.innerHTML : '';
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const nomFichier = `piano_workout_backup_${dateStr}.json`;
+
+    let fileHandle = null;
+    if (typeof window.showSaveFilePicker === 'function' && !(window.Capacitor && Capacitor.isNativePlatform())) {
+        try {
+            fileHandle = await window.showSaveFilePicker({
+                suggestedName: nomFichier,
+                types: [{
+                    description: 'Fichier JSON',
+                    accept: { 'application/json': ['.json'] }
+                }]
+            });
+        } catch (pickerErr) {
+            if (pickerErr.name === 'AbortError') return;
+            console.warn("showSaveFilePicker a échoué d'emblée, repli standard :", pickerErr);
+        }
+    }
+
     if (btn) btn.disabled = true;
     if (msg) { msg.style.display = 'block'; msg.textContent = t('settings.generating_json'); }
 
@@ -10399,9 +10429,7 @@ async function exporterBackupJson() {
 
         const jsonStr = JSON.stringify(backup, null, 2);
         const blob = new Blob([jsonStr], { type: 'application/json' });
-        const dateStr = new Date().toISOString().split('T')[0];
-        const nomFichier = `piano_workout_backup_${dateStr}.json`;
-        const res = await getSystemHost().saveBackupFile(nomFichier, blob, 'application/json');
+        const res = await getSystemHost().saveBackupFile(nomFichier, blob, 'application/json', { handle: fileHandle });
 
         if (msg) {
             if (res !== false) {
@@ -10424,6 +10452,26 @@ async function exporterBackupCompletZip() {
     const btn = document.getElementById('btn-export-zip');
     const msg = document.getElementById('backup-status-msg');
     const originalText = btn ? btn.innerHTML : '';
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const nomFichier = `piano_workout_backup_complet_${dateStr}.zip`;
+
+    let fileHandle = null;
+    if (typeof window.showSaveFilePicker === 'function' && !(window.Capacitor && Capacitor.isNativePlatform())) {
+        try {
+            fileHandle = await window.showSaveFilePicker({
+                suggestedName: nomFichier,
+                types: [{
+                    description: 'Archive ZIP',
+                    accept: { 'application/zip': ['.zip'] }
+                }]
+            });
+        } catch (pickerErr) {
+            if (pickerErr.name === 'AbortError') return;
+            console.warn("showSaveFilePicker a échoué d'emblée, repli standard :", pickerErr);
+        }
+    }
+
     if (btn) btn.disabled = true;
     if (msg) { msg.style.display = 'block'; msg.textContent = t('settings.reading_db'); }
 
@@ -10454,9 +10502,7 @@ async function exporterBackupCompletZip() {
             if (msg) msg.textContent = t('settings.compressing_zip_pct', { pct: Math.round(metadata.percent) });
         });
 
-        const dateStr = new Date().toISOString().split('T')[0];
-        const nomFichier = `piano_workout_backup_complet_${dateStr}.zip`;
-        const res = await getSystemHost().saveBackupFile(nomFichier, zipBlob, 'application/zip');
+        const res = await getSystemHost().saveBackupFile(nomFichier, zipBlob, 'application/zip', { handle: fileHandle });
 
         if (msg) {
             if (res !== false) {
