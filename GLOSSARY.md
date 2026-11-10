@@ -1,6 +1,6 @@
 # Jazz Trane'R
 
-Application de pratique quotidienne pour musiciens de jazz : on prépare une séance minutée, on la joue avec ses partitions et outils, et on suit sa progression dans le temps.
+Application de pratique quotidienne et d'apprentissage du jazz pour tous les instruments (en ut ou transpositeurs) : on prépare une séance minutée, on la joue avec ses partitions, ses grilles et ses outils interactifs, et on suit sa progression dans le temps.
 
 ## Vues de travail
 
@@ -34,13 +34,33 @@ _Éviter_ : vocabulaire, élément de bibliothèque, ressource
 Les quatre métadonnées musicales facultatives attachées à un item : `compositeur` (ou artiste/source), `style` (incluant la sensation rythmique comme Waltz ou Ballad), `tonalite` et `tempo`. Distincts des catégories et sous-catégories de classement.
 _Éviter_ : métadonnées, tags, propriétés, métrique
 
+**Grille** :
+La structure harmonique mesurée d'un morceau (accords, métrique, barres de reprise, sections, codas), affichable en accords absolus ou en degrés fonctionnels et transposable à la volée.
+_Éviter_ : chord chart, grille iReal, lead sheet
+
+**Partition Dynamique** :
+Une notation musicale structurée (importée en MusicXML ou saisie au clavier virtuel/MIDI) que l'application grave, transpose dans les 12 tonalités et fait défiler au tempo.
+_Éviter_ : partition XML, fichier MuseScore, score interactif
+
+**Drill** :
+Un exercice génératif minuté ou mesuré qui fait travailler un Item à travers un cycle de tonalités, de tempos ou de contraintes.
+_Éviter_ : entraînement automatique, shuffle
+
 **Setlist** :
 Une liste ordonnée de morceaux destinée à être travaillée en séance ou jouée d'affilée en Mode Live.
 _Éviter_ : playlist
 
 **Routine** :
-Un programme de séance réutilisable, enregistré pour être rechargé tel quel lors de la préparation d'une séance.
+Un programme à l'échelle d'une seule séance réutilisable, enregistré pour être rechargé tel quel lors de la préparation d'une séance.
 _Éviter_ : modèle, template
+
+**Plan** :
+Un parcours structuré regroupant plusieurs séances (ou Routines) ordonnées dans le temps, par exemple sur plusieurs jours ou semaines.
+_Éviter_ : cursus, programme pluriannuel, calendrier d'étude
+
+**Pack** :
+Un ensemble thématique ou par niveau importable d'un bloc, qui rassemble des Items (morceaux, licks, voicings, patterns), des consignes pédagogiques, des Routines et éventuellement un Plan.
+_Éviter_ : bundle, package, archive pédagogique
 
 ## Organisation du travail (méthode de développement)
 

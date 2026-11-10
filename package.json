@@ -1,14 +1,22 @@
 {
-  "name": "piano-workout",
+  "name": "jazz-trane-r",
   "version": "1.0.0",
-  "description": "",
+  "description": "Daily practice companion and learning suite for jazz musicians",
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "jazz",
+    "practice",
+    "sheet-music",
+    "ireal-pro",
+    "music-theory",
+    "android",
+    "capacitor"
+  ],
+  "author": "Paul Marconnet",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
