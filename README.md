@@ -1,123 +1,120 @@
-# Jazz Trane'R 🎷🎹
+# Jazz Trane'R
 
 [![Tests](https://img.shields.io/badge/tests-82%20passed%20(Vitest)-brightgreen.svg)](tests/)
 [![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Web%20(Capacitor%208)-blue.svg)](https://capacitorjs.com/)
-[![Architecture](https://img.shields.io/badge/architecture-Deep%20Vanilla%20Modules-orange.svg)](docs/adr/0001-modules-vanilla-sans-bundler.md)
+[![Architecture](https://img.shields.io/badge/architecture-Vanilla%20Modules-orange.svg)](docs/adr/0001-modules-vanilla-sans-bundler.md)
 [![License](https://img.shields.io/badge/license-ISC-lightgrey.svg)](package.json)
 
-**Jazz Trane'R** is an offline-first daily practice companion and learning suite engineered for jazz musicians (pianists, brass, woodwinds, guitarists, and bassists).
+**Jazz Trane'R** is an offline-first daily practice workspace and repertoire manager built for jazz musicians. Designed for Android tablets on the music stand as well as desktop browsers, it runs entirely locally with zero network dependency.
 
-It streamlines the daily practice routine: prepare a structured, timed session, play along with sheet music and dynamic chord charts, track key mastery and streaks, and organize jazz repertoire with an intelligent batch ingester.
-
----
-
-## ✨ Key Highlights
-
-- **🎯 Timed Practice Sessions & Immersive Mode**:
-  - Independent countdown and count-up timers per exercise, Pomodoro cycles, and AFK idle protection.
-  - Minimalist ambient clock (`HH:MM`) designed for distraction-free rehearsal rooms.
-  - Smart item selection factoring in favorites, practice recency, and repetition balance.
-
-- **📚 Smart Library & Trieur Express (Batch Ingester)**:
-  - Multi-level fuzzy deduplication: Level 1 handles jazz title canonicalization (e.g. `"Bags' Groove"` = `"Bag's Groove"`, `"'Round Midnight"` = `"Round Midnight"`), Level 2 suggests probable matches using normalized Levenshtein distance ($\ge 0.80$).
-  - One-tap import from **iReal Pro** URLs (`irealb://`), MusicXML chord symbols, and local PDFs/audio.
-  - Non-destructive metadata enrichment (`compositeur`, `style`, `tonalite`, `tempo`).
-
-- **📄 High-Performance Score Reader & Live Gig Mode**:
-  - Zero-flicker PDF page transitions via **Double-Buffering** (instant background pre-rendering of adjacent pages $N-1$ and $N+1$).
-  - Intelligent touch gesture arbitration: smooth 1-finger swipes for page turns; automatically locked to stylus/touch drawing when freehand annotation tools (pen, highlighter, eraser) are active.
-  - Seamless Setlist chaining for stage performance.
-
-- **📊 Practice Analytics & Progress Tracking**:
-  - Unified time accounting engine across live views, session summaries, and history cards.
-  - Custom canvas-rendered category donut chart with high-contrast palette.
-  - Weekly goal tracking, streak counter, and enharmonic key distribution analysis.
-
-- **📱 Deep Android Native Integration**:
-  - **Storage Access Framework (SAF)**: Native system "Save As..." dialog for `.json` and `.zip` backups without cache leakage ([ADR-0002](docs/adr/0002-dialogue-natif-sauvegarde-saf.md)).
-  - Contextual runtime microphone permissions requested on-demand when opening the voice recorder.
-  - Non-stacking, silent in-app notification scheduling aligned with Android system guidelines.
+It brings together structured session timers, a sheet music and audio library, built-in practice tools (metronome, A-B transcription looper, voice recorder, manuscript staff notebook), a stylus-ready PDF score reader with a Live Setlist mode, and practice analytics.
 
 ---
 
-## 🏛️ Architecture & Engineering
+## Features
 
-Jazz Trane'R follows a **Domain-Driven Design** and **Deep Module** philosophy ([ADR-0001](docs/adr/0001-modules-vanilla-sans-bundler.md)):
+### Practice Sessions & Immersive View
+- **Session Builder & Routines**: Create timed sessions across customizable categories (*Voicings*, *Patterns*, *Licks*, *Tunes*, *Transcriptions*, *Technique*), set an optional Key of the Day (with a random key generator), adjust durations via vertical swipe, and save reusable practice routines.
+- **Immersive Mode (*Mode Pupitre*)**: Distraction-free full-screen view featuring a circular timer, live completion ETA, a discreet 24h clock (`HH:MM`) to keep track of rehearsal room bookings, and one-tap access to audio tools.
+- **Smart Shuffle**: Automatically builds a practice queue from the library matching the active exercise's category and subcategories, prioritizing favorites, least-practiced items, and oldest-practiced items.
+- **Time Accounting**: Per-exercise countdown and count-up (*overtime*) timers, configurable Pomodoro work/break cycles (*Coffee Break*), and an automatic 60-minute overtime AFK cutoff so forgotten timers never skew practice history.
 
-```
-www/modules/
-├── library-domain.js       # Canonization, Levenshtein triage, iReal decode, setlists
-├── session-timer.js        # Pure state-machine for timers, AFK auto-stop, Pomodoro
-├── history-analytics.js    # Weekly targets, streaks, key metrics, donut charts
-├── score-navigation.js     # Pagination state machine, double-buffering pre-render cache
-├── storage-repo.js         # IndexedDB / Capacitor Filesystem storage abstraction seam
-└── system-host.js          # Platform bridge (Android SAF, native share, notifications)
-```
+### Built-in Practice Toolkit
+- **Metronome**: 30 to 300 BPM (adjustable via vertical swipe, mouse wheel, slider, or *Tap Tempo*), 2 to 9 beats per bar, quarter-note or eighth-note pulse, interactive beat sequencer with 3 states per beat (strong accent, regular beat, mute), and 3 synthesized WebAudio sound profiles (*Woodblock*, *Classic Click*, *Beep*).
+- **Audio Player & Transcription Looper**: HTML5 Canvas waveform display, A-B loop markers with draggable handles and whole-window dragging, pitch-preserving playback speeds (50%, 75%, 85%, 100%, 125%), ±5s quick skip, and continuous background playback while reading sheet music.
+- **Voice Recorder (Dictaphone)**: Live frequency visualizer, pause/resume recording, instant playback, local file export, or one-click linking of a recorded take directly to the tune currently being practiced.
+- **Manuscript Music Notebook (*Cahier de musique*)**: Blank staff paper generator (single staff or piano grand staff), dynamic addition of staff systems, toggleable barlines, stylus notation, direct library saving, and PDF export.
 
-- **Domain Model**: Strictly documented and enforced via [`GLOSSARY.md`](GLOSSARY.md).
-- **Issue & Roadmap Tracking**: Tracked directly in repo under [`.scratch/`](.scratch/) with formal specs and ticket wayfinding.
-- **Decision Records**: Documented under [`docs/adr/`](docs/adr/).
+### Score Reader, Stylus Annotations & Live Mode
+- **Flicker-Free PDF Rendering**: Multi-page PDF (`PDF.js`) and image score viewer using 3-canvas double-buffering (silent background pre-rendering of pages $N-1$ and $N+1$) so pages track the finger smoothly during swipe gestures.
+- **Stylus Annotation Suite**: Floating, draggable toolbar with a pen (1–10px thickness via long-press slider), straight line tool, floating text editor (drag to move, corner handle to resize), yellow highlighter, eraser, 3 ink colors, and a palm-rejection toggle (stylus-only vs. finger + stylus). Single-finger page swipes automatically lock whenever a drawing tool is active.
+- **Live Concert Mode**: Stage view built around Setlists. Includes a drag-and-drop setlist drawer (`SortableJS`), a top HUD showing the current and upcoming tune, seamless page turns from the last page of a tune to the first page of the next tune in the setlist, and a fallback lead-sheet card (key, composer, style) for tunes without an attached PDF.
+
+### Library & Batch Ingester (*Trieur Express*)
+- **Musical Metadata**: Every library item stores musical attributes (`compositeur`, `style`, `tonalite`, `tempo`), subcategories/setlists, multi-page PDFs or images, linked audio, favorite status, and practice count.
+- **iReal Pro Import**: Imports HTML backups and direct `irealb://` links shared from the iReal Pro Android app, extracting tune metadata and optionally creating the corresponding Setlist.
+- **Batch Ingester (*Trieur Express*)**: Imports `.zip` archives or multi-file selections (PDF, images, audio) with a choice between *Fast* and *Careful* modes. Includes two-tier deduplication:
+  1. *Exact Jazz Canonicalization*: Automatically merges punctuation and article variations (`"Bags' Groove"` = `"Bag's Groove"`, `"'Round Midnight"` = `"Round Midnight"`, `"Autumn Leaves, The"`).
+  2. *Fuzzy Matching*: Detects probable duplicates using normalized Levenshtein similarity ($\ge 0.80$) and offers non-destructive metadata and media merging.
+
+### Analytics & History Dashboard
+- **Core Metrics**: Weekly practice time, progress toward a configurable weekly hour target, current and all-time day streaks with an interactive monthly practice calendar, and most-practiced key (grouping relative major and minor keys).
+- **Interactive Charts (Chart.js)**: Time spent, category breakdown (custom canvas doughnut chart with direct slice labels), and key distribution across week, month, year, or all-time views. Includes a demo session generator to preview the dashboard.
+
+### Localization, Themes & Native Backups
+- **Bilingual UI & Themes**: Full French and English localization, plus 4 visual themes (*Espresso Dark / OLED*, *Argile*, *Groove*, *Cream*).
+- **Native OS Backups**: Full `.zip` export (database + all scores, audio files, and annotations) or lightweight `.json` export using native system file pickers (`Storage Access Framework` on Android, `showSaveFilePicker` on desktop) with a post-restore summary.
 
 ---
 
-## 🧪 Automated Test Suite
+## Architecture
 
-The core modules are 100% testable in Node.js without browser or DOM dependencies.
+The core domain logic is isolated in **6 vanilla modules** under `www/modules/`, loaded without a bundler ([ADR-0001](docs/adr/0001-modules-vanilla-sans-bundler.md)) to keep Capacitor Android sync instantaneous while allowing direct unit testing in Node.js via `vitest`:
 
-```bash
-# Run the test suite (Vitest)
-npm test
-
-# Run tests in watch mode during development
-npm run test:watch
+```text
+www/
+├── index.html               # Views and modals markup
+├── style.css                # Design system and 4 themes (OLED, Argile, Groove, Cream)
+├── i18n.js                  # Localization dictionaries (FR / EN)
+├── script.js                # UI controller, WebAudio (metronome, looper, recorder) & Canvas
+└── modules/
+    ├── library-domain.js    # Item normalization, jazz canonicalization, Levenshtein, iReal parser
+    ├── session-timer.js     # Pure state machine for exercise timers, Pomodoro, breaks & AFK cutoff
+    ├── history-analytics.js # Weekly targets, streaks, monthly calendar, key grouping & chart data
+    ├── score-navigation.js  # Pagination state machine, double-buffering pre-render targets & Live Mode
+    ├── storage-repo.js      # Persistence seam (IndexedDB / Capacitor Filesystem) & ZIP/JSON archives
+    └── system-host.js       # Host platform bridge (Android SAF backups, notifications, mic permissions)
 ```
 
-**Coverage includes 82 automated unit tests**:
-- Title canonicalization and fuzzy deduplication
-- Session timer transitions and AFK auto-stop edge cases
-- Enharmonic key analysis and weekly analytics calculations
-- Score reader pagination bounds and annotation touch locks
-- Storage repository serialization and SAF backup payload validation
+Architecture Decision Records are available in [`docs/adr/`](docs/adr/):
+- [ADR-0001](docs/adr/0001-modules-vanilla-sans-bundler.md) — Bundler-free Vanilla modules loaded before `script.js`.
+- [ADR-0002](docs/adr/0002-dialogue-natif-sauvegarde-saf.md) — Native OS "Save As..." dialog for backups.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [Android Studio](https://developer.android.com/studio) (for Android tablet build)
+- [Node.js](https://nodejs.org/) (v18+)
+- [Android Studio](https://developer.android.com/studio) (for Android APK builds)
 
 ### Installation
 ```bash
-git clone https://github.com/PaulMarconnet/jazz-trane-r.git
+git clone [https://github.com/PaulMarconnet/jazz-trane-r.git](https://github.com/PaulMarconnet/jazz-trane-r.git)
 cd jazz-trane-r
 npm install
 ```
 
-### Development & Android Build
+### Running Tests
+The 6 core modules are covered by 82 automated unit tests (`vitest`) running in Node.js without DOM dependencies:
 ```bash
-# Run unit tests
+# Run the test suite
 npm test
 
-# Sync web assets to Capacitor Android project
+# Run tests in watch mode
+npm run test:watch
+```
+
+### Android Build (Capacitor)
+```bash
+# Sync web assets to the Capacitor Android project
 npx cap sync android
 
-# Open project in Android Studio
+# Open the project in Android Studio
 npx cap open android
 ```
 
 ---
 
-## 📋 Tech Stack
+## Roadmap (V2)
 
-- **Runtime**: Vanilla ES6+ Modules (Zero bundler friction, instant Android sync)
-- **Mobile Container**: [Capacitor 8](https://capacitorjs.com/) with native Java plugins
-- **Test Runner**: [Vitest 5](https://vitest.dev/)
-- **PDF & Graphics**: PDF.js, HTML5 Canvas Double-Buffering, Chart.js
-- **Audio DSP**: WebAudio API (time-stretching & synthesis engine in active roadmap)
+Upcoming milestones specified in the [V2 architecture map](.scratch/):
+- **Spec 2**: Vite build tooling, transposing instrument profiles ($C, B\flat, E\flat$), native vector chord chart renderer (full `irealb://` unobfuscation, MusicXML `<harmony>` import, functional degrees, *Blindfold* mode), *Inner Clock / Gap Click* metronome, harmonic *Drone*, and *Call & Response* audio studio with pitch-shift/time-stretch (`signalsmith-stretch`).
+- **Spec 3**: Dynamic notation (`VexFlow` + offline piano sampler) with 12-key transposition and hands-free generative *Drills*.
+- **Spec 4 & 5**: Jazz *Ear Training* studio (scale degrees over drone, custom voicing and cadence dictations) and real-time polyphonic/melodic validation via WebMIDI and microphone.
 
 ---
 
-## 📄 License
+## License
 
 ISC © Paul Marconnet
